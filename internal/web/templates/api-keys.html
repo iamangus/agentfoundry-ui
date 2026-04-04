@@ -1,0 +1,202 @@
+{{define "api-keys.html"}}<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>API Keys — agentfoundry</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/frankenstyle@0.3.7/dist/css/frankenstyle-kit.min.css">
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <style>
+    :root {
+      --uk-primary: oklch(59.1% 0.249 292.7);
+      --uk-primary-f: oklch(100% 0 0);
+      --uk-focus: oklch(66.6% 0.247 292.0);
+    }
+    .dark {
+      --bg-base:    #0f0f11;
+      --bg-sidebar: #0a0a0d;
+      --bg-card:    #18181c;
+      --border:     #27272a;
+      --text-base:  #e4e4e7;
+      --text-muted: #71717a;
+      --purple:     oklch(59.1% 0.249 292.7);
+      --purple-dim: oklch(59.1% 0.249 292.7 / 0.15);
+      --purple-solid: #7c3aed;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; font-family: 'Inter', system-ui, -apple-system, sans-serif; background: var(--bg-base); color: var(--text-base); }
+
+    .page-body { flex: 1; overflow-y: auto; }
+
+    .key-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      transition: border-color 0.15s;
+    }
+    .key-card:hover { border-color: oklch(59.1% 0.249 292.7 / 0.3); }
+    .key-name { font-size: 0.9rem; font-weight: 600; }
+    .key-prefix { font-size: 0.8rem; color: var(--text-muted); font-family: ui-monospace, monospace; }
+    .key-meta { font-size: 0.75rem; color: var(--text-muted); }
+
+    .btn-primary {
+      padding: 8px 20px; background: var(--purple-solid); color: #fff;
+      border: none; border-radius: 8px; font-family: inherit; font-size: 0.85rem;
+      font-weight: 600; cursor: pointer; transition: opacity 0.15s;
+    }
+    .btn-primary:hover { opacity: 0.88; }
+    .btn-danger-sm {
+      padding: 4px 12px; border-radius: 6px; font-size: 0.75rem; font-family: inherit;
+      cursor: pointer; border: 1px solid oklch(50% 0.2 25 / 0.3);
+      background: transparent; color: oklch(65% 0.2 25);
+      transition: background 0.12s;
+    }
+    .btn-danger-sm:hover { background: oklch(50% 0.2 25 / 0.15); }
+
+    .new-key-modal {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+      display: flex; align-items: center; justify-content: center; z-index: 100;
+    }
+    .new-key-panel {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: 14px; padding: 24px; width: 480px; max-width: 90vw;
+    }
+    .new-key-panel h3 { margin: 0 0 16px; font-size: 1rem; font-weight: 600; }
+    .field-label {
+      display: block; margin-bottom: 4px; font-size: 0.7rem; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted);
+    }
+    .field-input {
+      width: 100%; background: var(--bg-base); border: 1px solid var(--border);
+      border-radius: 8px; padding: 8px 12px; color: var(--text-base);
+      font-family: inherit; font-size: 0.85rem; outline: none;
+      transition: border-color 0.15s;
+    }
+    .field-input:focus { border-color: oklch(59.1% 0.249 292.7 / 0.6); }
+    .full-key-display {
+      background: var(--bg-base); border: 1px solid var(--border);
+      border-radius: 8px; padding: 12px; font-family: ui-monospace, monospace;
+      font-size: 0.82rem; word-break: break-all; line-height: 1.5;
+      color: var(--purple); margin: 12px 0;
+    }
+    .warning-text { font-size: 0.78rem; color: oklch(65% 0.2 25); margin: 8px 0 0; }
+
+    .empty-state {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 80px 0; text-align: center;
+    }
+  </style>
+</head>
+<body style="display:flex; flex-direction:column; min-height:100vh;">
+
+{{template "navbar" .}}
+
+<div class="page-body" style="padding: 32px 24px;">
+  <div style="max-width: 720px; margin: 0 auto;">
+    <div style="display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:24px;">
+      <div>
+        <h1 style="font-size:1rem; font-weight:600; margin:0 0 4px;">API Keys</h1>
+        <p style="font-size:0.8rem; color:var(--text-muted); margin:0;">
+          Personal API keys for programmatic access. The full key is shown only once.
+        </p>
+      </div>
+      <button class="btn-primary" onclick="document.getElementById('new-key-modal').style.display='flex'">
+        Create Key
+      </button>
+    </div>
+
+    <div id="api-key-list">
+      {{template "api-key-list" .}}
+    </div>
+  </div>
+</div>
+
+<div id="new-key-modal" class="new-key-modal" style="display:none;">
+  <div class="new-key-panel">
+    <h3>Create API Key</h3>
+    <div id="key-create-form">
+      <label class="field-label">Name</label>
+      <input type="text" id="key-name" class="field-input" placeholder="e.g. my-script" style="margin-bottom:16px;" />
+      <button class="btn-primary" style="width:100%;" onclick="createKey()">Create</button>
+    </div>
+    <div id="key-result" style="display:none;">
+      <label class="field-label">Your API Key</label>
+      <div class="full-key-display" id="full-key-value"></div>
+      <p class="warning-text">Copy this key now. It cannot be shown again.</p>
+      <button class="btn-primary" style="width:100%; margin-top:16px;" onclick="copyKeyAndClose()">Copy & Close</button>
+    </div>
+    <button style="width:100%; margin-top:12px; padding:8px; background:transparent; border:1px solid var(--border); border-radius:8px; color:var(--text-muted); font-family:inherit; font-size:0.85rem; cursor:pointer;" onclick="document.getElementById('new-key-modal').style.display='none'; document.getElementById('key-create-form').style.display='block'; document.getElementById('key-result').style.display='none';">
+      Cancel
+    </button>
+  </div>
+</div>
+
+<script>
+function createKey() {
+  var name = document.getElementById('key-name').value.trim();
+  if (!name) { alert('Name is required'); return; }
+
+  fetch('/api-keys', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({name: name})
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    document.getElementById('full-key-value').textContent = data.full_key;
+    document.getElementById('key-create-form').style.display = 'none';
+    document.getElementById('key-result').style.display = 'block';
+    htmx.ajax('GET', '/api-keys', '#api-key-list');
+  })
+  .catch(function(err) { alert('Failed to create key: ' + err); });
+}
+
+function copyKeyAndClose() {
+  var key = document.getElementById('full-key-value').textContent;
+  navigator.clipboard.writeText(key).then(function() {
+    document.getElementById('new-key-modal').style.display = 'none';
+    document.getElementById('key-create-form').style.display = 'block';
+    document.getElementById('key-result').style.display = 'none';
+    document.getElementById('key-name').value = '';
+  });
+}
+
+function revokeKey(id, name) {
+  if (!confirm('Revoke key "' + name + '"? This cannot be undone.')) return;
+  htmx.ajax('DELETE', '/api-keys/' + id, '#api-key-list');
+}
+</script>
+
+</body>
+</html>
+{{end}}
+
+{{define "api-key-list"}}
+{{if .Keys}}
+<div style="display:flex; flex-direction:column; gap:8px;">
+  {{range .Keys}}
+  <div class="key-card">
+    <div>
+      <div class="key-name">{{.Name}}</div>
+      <div class="key-prefix">{{.KeyPrefix}}...</div>
+      <div class="key-meta">Created {{.CreatedAt.Format "2006-01-02 15:04"}}{{if .LastUsedAt}} · Last used {{.LastUsedAt.Format "2006-01-02 15:04"}}{{end}}</div>
+    </div>
+    <button class="btn-danger-sm" onclick="revokeKey('{{.ID}}', '{{.Name}}')">Revoke</button>
+  </div>
+  {{end}}
+</div>
+{{else}}
+<div class="empty-state">
+  <p style="font-size:0.9rem; font-weight:600; color:var(--text-base); margin:0 0 6px;">No API keys</p>
+  <p style="font-size:0.8rem; color:var(--text-muted); margin:0;">Create a key to access the API programmatically.</p>
+</div>
+{{end}}
+{{end}}
