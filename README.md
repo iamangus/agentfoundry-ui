@@ -48,6 +48,8 @@ All configuration is via environment variables.
 | `KEYCLOAK_CLIENT_ID` | *(empty, auth disabled)* | Public client ID for the UI |
 | `KEYCLOAK_CLIENT_SECRET` | *(empty)* | Client secret (if confidential client) |
 | `SESSION_SECRET` | *(empty, auth disabled)* | Required to enable auth |
+| `AUTH_ADMIN_ROLES` | `opendev-admin` | Realm role for admin badge in navbar |
+| `AUTH_TEAM_ADMIN_ROLE` | `team-admin` | Realm role for team-admin badge in navbar |
 
 Auth is disabled by default. Set all of `KEYCLOAK_URL`, `KEYCLOAK_REALM`, `KEYCLOAK_CLIENT_ID`, and `SESSION_SECRET` to enable OIDC login.
 
