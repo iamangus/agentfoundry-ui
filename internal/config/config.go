@@ -11,6 +11,9 @@ type Config struct {
 	KeycloakClientID     string
 	KeycloakClientSecret string
 	SessionSecret        string
+
+	AdminRole     string
+	TeamAdminRole string
 }
 
 func Load() *Config {
@@ -33,7 +36,17 @@ func Load() *Config {
 		KeycloakClientID:     os.Getenv("KEYCLOAK_CLIENT_ID"),
 		KeycloakClientSecret: os.Getenv("KEYCLOAK_CLIENT_SECRET"),
 		SessionSecret:        os.Getenv("SESSION_SECRET"),
+
+		AdminRole:     envOrDefault("AUTH_ADMIN_ROLES", "opendev-admin"),
+		TeamAdminRole: envOrDefault("AUTH_TEAM_ADMIN_ROLE", "team-admin"),
 	}
+}
+
+func envOrDefault(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
 }
 
 func (c *Config) AuthEnabled() bool {

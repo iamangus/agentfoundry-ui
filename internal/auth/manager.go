@@ -140,7 +140,7 @@ func (m *Manager) ExchangeCode(ctx context.Context, code, redirectURL string) (*
 
 	isAdmin := false
 	for _, r := range roles {
-		if r == "opendev-admin" {
+		if r == m.cfg.AdminRole {
 			isAdmin = true
 			break
 		}
@@ -148,7 +148,7 @@ func (m *Manager) ExchangeCode(ctx context.Context, code, redirectURL string) (*
 
 	isTeamAdmin := false
 	for _, r := range roles {
-		if r == "team-admin" {
+		if r == m.cfg.TeamAdminRole {
 			isTeamAdmin = true
 			break
 		}
