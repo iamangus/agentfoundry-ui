@@ -113,14 +113,14 @@ func (m *Manager) ExchangeCode(ctx context.Context, code, redirectURL string) (*
 
 	var tokenResp struct {
 		AccessToken string `json:"access_token"`
+		IDToken     string `json:"id_token"`
 		ExpiresIn   int    `json:"expires_in"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&tokenResp); err != nil {
 		return nil, fmt.Errorf("decode token response: %w", err)
 	}
 
-	rawIDToken := tokenResp.AccessToken
-	idToken, err := m.verifier.Verify(ctx, rawIDToken)
+	idToken, err := m.verifier.Verify(ctx, tokenResp.IDToken)
 	if err != nil {
 		return nil, fmt.Errorf("verify token: %w", err)
 	}
