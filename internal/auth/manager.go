@@ -306,6 +306,12 @@ func (m *Manager) Middleware(next http.Handler) http.Handler {
 			return
 		}
 
+		switch r.URL.Path {
+		case "/auth/login", "/auth/callback", "/auth/logout", "/auth/me":
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		cookie, err := r.Cookie("session")
 		if err != nil {
 			m.redirectToLogin(w, r)
