@@ -142,19 +142,12 @@ func TestManager_Middleware_NoCookie(t *testing.T) {
 	rec := httptest.NewRecorder()
 	mw.ServeHTTP(rec, req)
 
-	if rec.Code != http.StatusUnauthorized {
-		t.Errorf("got status %d, want 401", rec.Code)
+	if rec.Code != http.StatusFound {
+		t.Errorf("got status %d, want 302", rec.Code)
 	}
-	ct := rec.Header().Get("Content-Type")
-	if !strings.Contains(ct, "text/html") {
-		t.Errorf("expected HTML content type, got %q", ct)
-	}
-	body := rec.Body.String()
-	if !strings.Contains(body, "agentfoundry") {
-		t.Error("expected agentfoundry branding in login page")
-	}
-	if !strings.Contains(body, "Sign in with Keycloak") {
-		t.Error("expected sign in button in login page")
+	loc := rec.Header().Get("Location")
+	if loc != "/auth/login" {
+		t.Errorf("expected redirect to /auth/login, got %q", loc)
 	}
 }
 
@@ -170,8 +163,8 @@ func TestManager_Middleware_InvalidSession(t *testing.T) {
 	rec := httptest.NewRecorder()
 	mw.ServeHTTP(rec, req)
 
-	if rec.Code != http.StatusUnauthorized {
-		t.Errorf("got status %d, want 401", rec.Code)
+	if rec.Code != http.StatusFound {
+		t.Errorf("got status %d, want 302", rec.Code)
 	}
 
 	cookie := rec.Result().Cookies()

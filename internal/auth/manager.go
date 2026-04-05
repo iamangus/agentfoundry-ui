@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
 	"strings"
 	"sync"
@@ -337,24 +336,7 @@ func (m *Manager) Middleware(next http.Handler) http.Handler {
 }
 
 func (m *Manager) redirectToLogin(w http.ResponseWriter, r *http.Request) {
-	state := GenerateState()
-	http.SetCookie(w, &http.Cookie{
-		Name:     "oauth_state",
-		Value:    state,
-		Path:     "/",
-		Secure:   false,
-		HttpOnly: true,
-		MaxAge:   600,
-	})
-
-	callbackURL := schemeForRequest(r) + "://" + r.Host + "/auth/callback"
-
-	loginURL := m.LoginURL(state, callbackURL)
-	slog.Info("serving login page", "login_url", loginURL)
-
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.WriteHeader(http.StatusUnauthorized)
-	w.Write([]byte(renderLoginPage(loginURL)))
+	http.Redirect(w, r, "/auth/login", http.StatusFound)
 }
 
 func renderLoginPage(loginURL string) string {
