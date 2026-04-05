@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"embed"
 	"encoding/json"
 	"fmt"
@@ -217,14 +218,14 @@ func (h *Handler) redirectToChat(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) chatPage(w http.ResponseWriter, r *http.Request) {
 	sessionID := r.URL.Query().Get("session")
 
-	agents, err := h.client.ListAgents()
+	agents, err := h.client.ListAgents(r.Context())
 	if err != nil {
 		slog.Error("failed to list agents", "error", err)
 		http.Error(w, "backend error", http.StatusBadGateway)
 		return
 	}
 
-	sessions, err := h.client.ListSessions()
+	sessions, err := h.client.ListSessions(r.Context())
 	if err != nil {
 		slog.Error("failed to list sessions", "error", err)
 		http.Error(w, "backend error", http.StatusBadGateway)
@@ -267,15 +268,15 @@ func (h *Handler) newSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sess, err := h.client.CreateSession(agentName)
+	sess, err := h.client.CreateSession(r.Context(), agentName)
 	if err != nil {
 		slog.Error("failed to create session", "error", err)
 		http.Error(w, "backend error", http.StatusBadGateway)
 		return
 	}
 
-	agents, _ := h.client.ListAgents()
-	sessions, _ := h.client.ListSessions()
+	agents, _ := h.client.ListAgents(r.Context())
+	sessions, _ := h.client.ListSessions(r.Context())
 
 	if r.Header.Get("HX-Request") == "true" {
 		w.Header().Set("HX-Push-Url", "/chat?session="+sess.ID)
@@ -301,7 +302,7 @@ func (h *Handler) postMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.client.PostMessage(sessionID, content)
+	result, err := h.client.PostMessage(r.Context(), sessionID, content)
 	if err != nil {
 		slog.Error("failed to post message", "session", sessionID, "error", err)
 		http.Error(w, "backend error", http.StatusBadGateway)
@@ -319,7 +320,7 @@ func (h *Handler) postMessage(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) runEvents(w http.ResponseWriter, r *http.Request) {
 	runID := r.PathValue("id")
 
-	reader, err := h.client.StreamRunEventsReader(runID)
+	reader, err := h.client.StreamRunEventsReader(r.Context(), runID)
 	if err != nil {
 		slog.Error("failed to connect to SSE stream", "run", runID, "error", err)
 		http.Error(w, "stream error", http.StatusBadGateway)
@@ -354,7 +355,7 @@ func (h *Handler) runEvents(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) sessionListPartial(w http.ResponseWriter, r *http.Request) {
-	sessions, err := h.client.ListSessions()
+	sessions, err := h.client.ListSessions(r.Context())
 	if err != nil {
 		slog.Error("failed to list sessions", "error", err)
 		http.Error(w, "backend error", http.StatusBadGateway)
@@ -368,7 +369,7 @@ func (h *Handler) sessionListPartial(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) agentsPage(w http.ResponseWriter, r *http.Request) {
-	agents, err := h.client.ListAgents()
+	agents, err := h.client.ListAgents(r.Context())
 	if err != nil {
 		slog.Error("failed to list agents", "error", err)
 		http.Error(w, "backend error", http.StatusBadGateway)
@@ -383,7 +384,7 @@ func (h *Handler) agentsPage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) agentListPartial(w http.ResponseWriter, r *http.Request) {
-	agents, err := h.client.ListAgents()
+	agents, err := h.client.ListAgents(r.Context())
 	if err != nil {
 		slog.Error("failed to list agents", "error", err)
 		http.Error(w, "backend error", http.StatusBadGateway)
@@ -398,7 +399,7 @@ func (h *Handler) agentListPartial(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) agentEditPartial(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
-	def, err := h.client.GetAgent(name)
+	def, err := h.client.GetAgent(r.Context(), name)
 	if err != nil {
 		slog.Error("failed to get agent", "name", name, "error", err)
 		http.Error(w, "agent not found", http.StatusNotFound)
@@ -430,14 +431,14 @@ func (h *Handler) saveAgentForm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	saved, err := h.client.UpdateAgent(originalName, def)
+	saved, err := h.client.UpdateAgent(r.Context(), originalName, def)
 	if err != nil {
 		slog.Error("failed to save agent", "name", newName, "error", err)
 		http.Error(w, "failed to save", http.StatusInternalServerError)
 		return
 	}
 
-	agents, _ := h.client.ListAgents()
+	agents, _ := h.client.ListAgents(r.Context())
 	h.renderPartial(w, "save-agent-response", saveYamlData{
 		Editor: agentEditorData{Def: saved, StructuredOutputJSON: structuredOutputJSON(saved), User: h.userFromRequest(r)},
 		Agents: agents,
@@ -457,14 +458,14 @@ func (h *Handler) createAgentFormNew(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	saved, err := h.client.CreateAgent(def)
+	saved, err := h.client.CreateAgent(r.Context(), def)
 	if err != nil {
 		slog.Error("failed to create agent", "name", def.Name, "error", err)
 		http.Error(w, "failed to create", http.StatusInternalServerError)
 		return
 	}
 
-	agents, _ := h.client.ListAgents()
+	agents, _ := h.client.ListAgents(r.Context())
 	h.renderPartial(w, "save-agent-response", saveYamlData{
 		Editor: agentEditorData{Def: saved, StructuredOutputJSON: structuredOutputJSON(saved), User: h.userFromRequest(r)},
 		Agents: agents,
@@ -473,13 +474,13 @@ func (h *Handler) createAgentFormNew(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) cloneAgent(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
-	src, err := h.client.GetAgent(name)
+	src, err := h.client.GetAgent(r.Context(), name)
 	if err != nil {
 		http.Error(w, "agent not found: "+name, http.StatusNotFound)
 		return
 	}
 
-	agents, _ := h.client.ListAgents()
+	agents, _ := h.client.ListAgents(r.Context())
 	existing := make(map[string]bool, len(agents))
 	for _, a := range agents {
 		existing[a.Name] = true
@@ -499,14 +500,14 @@ func (h *Handler) cloneAgent(w http.ResponseWriter, r *http.Request) {
 		clone.StructuredOutput = &so
 	}
 
-	saved, err := h.client.CreateAgent(&clone)
+	saved, err := h.client.CreateAgent(r.Context(), &clone)
 	if err != nil {
 		slog.Error("failed to clone agent", "source", name, "clone", cloneName, "error", err)
 		http.Error(w, "failed to clone", http.StatusInternalServerError)
 		return
 	}
 
-	agents, _ = h.client.ListAgents()
+	agents, _ = h.client.ListAgents(r.Context())
 	h.renderPartial(w, "save-agent-response", saveYamlData{
 		Editor: agentEditorData{Def: saved, StructuredOutputJSON: structuredOutputJSON(saved), User: h.userFromRequest(r)},
 		Agents: agents,
@@ -515,17 +516,17 @@ func (h *Handler) cloneAgent(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) deleteAgentWeb(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
-	if err := h.client.DeleteAgent(name); err != nil {
+	if err := h.client.DeleteAgent(r.Context(), name); err != nil {
 		slog.Error("failed to delete agent", "name", name, "error", err)
 		http.Error(w, "failed to delete", http.StatusInternalServerError)
 		return
 	}
-	agents, _ := h.client.ListAgents()
+	agents, _ := h.client.ListAgents(r.Context())
 	h.renderPartial(w, "agent-list-items", agentsPageData{Agents: agents})
 }
 
 func (h *Handler) toolsPage(w http.ResponseWriter, r *http.Request) {
-	servers, err := h.buildServerTools()
+	servers, err := h.buildServerTools(r.Context())
 	if err != nil {
 		slog.Error("failed to list tools", "error", err)
 		http.Error(w, "backend error", http.StatusBadGateway)
@@ -540,7 +541,7 @@ func (h *Handler) toolsPage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) toolListPartial(w http.ResponseWriter, r *http.Request) {
-	servers, err := h.buildServerTools()
+	servers, err := h.buildServerTools(r.Context())
 	if err != nil {
 		slog.Error("failed to list tools", "error", err)
 		http.Error(w, "backend error", http.StatusBadGateway)
@@ -579,7 +580,7 @@ func (h *Handler) toolGeneratePartial(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) apiKeysPage(w http.ResponseWriter, r *http.Request) {
-	keys, err := h.client.ListAPIKeys()
+	keys, err := h.client.ListAPIKeys(r.Context())
 	if err != nil {
 		slog.Error("failed to list api keys", "error", err)
 		http.Error(w, "backend error", http.StatusBadGateway)
@@ -620,7 +621,7 @@ func (h *Handler) createAPIKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	key, err := h.client.CreateAPIKey(req.Name)
+	key, err := h.client.CreateAPIKey(r.Context(), req.Name)
 	if err != nil {
 		slog.Error("failed to create api key", "error", err)
 		http.Error(w, "failed to create key", http.StatusInternalServerError)
@@ -633,13 +634,13 @@ func (h *Handler) createAPIKey(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) revokeAPIKey(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	if err := h.client.RevokeAPIKey(id); err != nil {
+	if err := h.client.RevokeAPIKey(r.Context(), id); err != nil {
 		slog.Error("failed to revoke api key", "id", id, "error", err)
 		http.Error(w, "failed to revoke", http.StatusInternalServerError)
 		return
 	}
 
-	keys, _ := h.client.ListAPIKeys()
+	keys, _ := h.client.ListAPIKeys(r.Context())
 	keyData := make([]apiKeyData, len(keys))
 	for i, k := range keys {
 		keyData[i] = apiKeyData{
@@ -660,8 +661,8 @@ func (h *Handler) revokeAPIKey(w http.ResponseWriter, r *http.Request) {
 	h.renderPartial(w, "api-key-list", data)
 }
 
-func (h *Handler) buildServerTools() ([]serverTools, error) {
-	allTools, err := h.client.ListTools()
+func (h *Handler) buildServerTools(ctx context.Context) ([]serverTools, error) {
+	allTools, err := h.client.ListTools(ctx)
 	if err != nil {
 		return nil, err
 	}

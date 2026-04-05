@@ -80,9 +80,9 @@ func (c *Client) withAuth(req *http.Request) {
 	}
 }
 
-func (c *Client) get(path string) (*http.Response, error) {
+func (c *Client) get(ctx context.Context, path string) (*http.Response, error) {
 	u := c.baseURL.JoinPath(path)
-	req, err := http.NewRequest(http.MethodGet, u.String(), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -90,13 +90,13 @@ func (c *Client) get(path string) (*http.Response, error) {
 	return c.httpClient.Do(req)
 }
 
-func (c *Client) postJSON(path string, body any) (*http.Response, error) {
+func (c *Client) postJSON(ctx context.Context, path string, body any) (*http.Response, error) {
 	u := c.baseURL.JoinPath(path)
 	data, err := json.Marshal(body)
 	if err != nil {
 		return nil, fmt.Errorf("marshal request: %w", err)
 	}
-	req, err := http.NewRequest(http.MethodPost, u.String(), bytes.NewReader(data))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u.String(), bytes.NewReader(data))
 	if err != nil {
 		return nil, err
 	}
@@ -105,13 +105,13 @@ func (c *Client) postJSON(path string, body any) (*http.Response, error) {
 	return c.httpClient.Do(req)
 }
 
-func (c *Client) putJSON(path string, body any) (*http.Response, error) {
+func (c *Client) putJSON(ctx context.Context, path string, body any) (*http.Response, error) {
 	u := c.baseURL.JoinPath(path)
 	data, err := json.Marshal(body)
 	if err != nil {
 		return nil, fmt.Errorf("marshal request: %w", err)
 	}
-	req, err := http.NewRequest(http.MethodPut, u.String(), bytes.NewReader(data))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, u.String(), bytes.NewReader(data))
 	if err != nil {
 		return nil, err
 	}
@@ -120,9 +120,9 @@ func (c *Client) putJSON(path string, body any) (*http.Response, error) {
 	return c.httpClient.Do(req)
 }
 
-func (c *Client) delete(path string) (*http.Response, error) {
+func (c *Client) delete(ctx context.Context, path string) (*http.Response, error) {
 	u := c.baseURL.JoinPath(path)
-	req, err := http.NewRequest(http.MethodDelete, u.String(), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, u.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -145,8 +145,8 @@ func (c *Client) decodeJSON(resp *http.Response, v any) error {
 	return json.NewDecoder(resp.Body).Decode(v)
 }
 
-func (c *Client) ListAgents() ([]*Definition, error) {
-	resp, err := c.get("/api/v1/agents")
+func (c *Client) ListAgents(ctx context.Context) ([]*Definition, error) {
+	resp, err := c.get(ctx, "/api/v1/agents")
 	if err != nil {
 		return nil, err
 	}
@@ -157,8 +157,8 @@ func (c *Client) ListAgents() ([]*Definition, error) {
 	return agents, nil
 }
 
-func (c *Client) GetAgent(name string) (*Definition, error) {
-	resp, err := c.get("/api/v1/agents/" + url.PathEscape(name))
+func (c *Client) GetAgent(ctx context.Context, name string) (*Definition, error) {
+	resp, err := c.get(ctx, "/api/v1/agents/"+url.PathEscape(name))
 	if err != nil {
 		return nil, err
 	}
@@ -169,8 +169,8 @@ func (c *Client) GetAgent(name string) (*Definition, error) {
 	return &def, nil
 }
 
-func (c *Client) CreateAgent(def *Definition) (*Definition, error) {
-	resp, err := c.postJSON("/api/v1/agents", def)
+func (c *Client) CreateAgent(ctx context.Context, def *Definition) (*Definition, error) {
+	resp, err := c.postJSON(ctx, "/api/v1/agents", def)
 	if err != nil {
 		return nil, err
 	}
@@ -181,8 +181,8 @@ func (c *Client) CreateAgent(def *Definition) (*Definition, error) {
 	return &created, nil
 }
 
-func (c *Client) UpdateAgent(name string, def *Definition) (*Definition, error) {
-	resp, err := c.putJSON("/api/v1/agents/"+url.PathEscape(name), def)
+func (c *Client) UpdateAgent(ctx context.Context, name string, def *Definition) (*Definition, error) {
+	resp, err := c.putJSON(ctx, "/api/v1/agents/"+url.PathEscape(name), def)
 	if err != nil {
 		return nil, err
 	}
@@ -193,8 +193,8 @@ func (c *Client) UpdateAgent(name string, def *Definition) (*Definition, error) 
 	return &updated, nil
 }
 
-func (c *Client) DeleteAgent(name string) error {
-	resp, err := c.delete("/api/v1/agents/" + url.PathEscape(name))
+func (c *Client) DeleteAgent(ctx context.Context, name string) error {
+	resp, err := c.delete(ctx, "/api/v1/agents/"+url.PathEscape(name))
 	if err != nil {
 		return err
 	}
@@ -205,8 +205,8 @@ func (c *Client) DeleteAgent(name string) error {
 	return nil
 }
 
-func (c *Client) ListTools() ([]ToolInfo, error) {
-	resp, err := c.get("/api/v1/tools")
+func (c *Client) ListTools(ctx context.Context) ([]ToolInfo, error) {
+	resp, err := c.get(ctx, "/api/v1/tools")
 	if err != nil {
 		return nil, err
 	}
@@ -217,8 +217,8 @@ func (c *Client) ListTools() ([]ToolInfo, error) {
 	return tools, nil
 }
 
-func (c *Client) CreateSession(agentName string) (*Session, error) {
-	resp, err := c.postJSON("/api/v1/chat/sessions", map[string]string{"agent_name": agentName})
+func (c *Client) CreateSession(ctx context.Context, agentName string) (*Session, error) {
+	resp, err := c.postJSON(ctx, "/api/v1/chat/sessions", map[string]string{"agent_name": agentName})
 	if err != nil {
 		return nil, err
 	}
@@ -229,8 +229,8 @@ func (c *Client) CreateSession(agentName string) (*Session, error) {
 	return &sess, nil
 }
 
-func (c *Client) GetSession(id string) (*Session, error) {
-	resp, err := c.get("/api/v1/chat/sessions/" + url.PathEscape(id))
+func (c *Client) GetSession(ctx context.Context, id string) (*Session, error) {
+	resp, err := c.get(ctx, "/api/v1/chat/sessions/"+url.PathEscape(id))
 	if err != nil {
 		return nil, err
 	}
@@ -241,8 +241,8 @@ func (c *Client) GetSession(id string) (*Session, error) {
 	return &sess, nil
 }
 
-func (c *Client) ListSessions() ([]*Session, error) {
-	resp, err := c.get("/api/v1/chat/sessions")
+func (c *Client) ListSessions(ctx context.Context) ([]*Session, error) {
+	resp, err := c.get(ctx, "/api/v1/chat/sessions")
 	if err != nil {
 		return nil, err
 	}
@@ -253,8 +253,8 @@ func (c *Client) ListSessions() ([]*Session, error) {
 	return sessions, nil
 }
 
-func (c *Client) PostMessage(sessionID, message string) (*PostMessageResponse, error) {
-	resp, err := c.postJSON("/api/v1/chat/sessions/"+url.PathEscape(sessionID)+"/messages", map[string]string{"message": message})
+func (c *Client) PostMessage(ctx context.Context, sessionID, message string) (*PostMessageResponse, error) {
+	resp, err := c.postJSON(ctx, "/api/v1/chat/sessions/"+url.PathEscape(sessionID)+"/messages", map[string]string{"message": message})
 	if err != nil {
 		return nil, err
 	}
@@ -265,9 +265,9 @@ func (c *Client) PostMessage(sessionID, message string) (*PostMessageResponse, e
 	return &result, nil
 }
 
-func (c *Client) StreamRunEvents(runID string) (*http.Response, error) {
+func (c *Client) StreamRunEvents(ctx context.Context, runID string) (*http.Response, error) {
 	u := c.baseURL.JoinPath("/api/v1/chat/runs/" + url.PathEscape(runID) + "/events")
-	req, err := http.NewRequest(http.MethodGet, u.String(), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -276,8 +276,8 @@ func (c *Client) StreamRunEvents(runID string) (*http.Response, error) {
 	return c.httpClient.Do(req)
 }
 
-func (c *Client) StreamRunEventsReader(runID string) (io.ReadCloser, error) {
-	resp, err := c.StreamRunEvents(runID)
+func (c *Client) StreamRunEventsReader(ctx context.Context, runID string) (io.ReadCloser, error) {
+	resp, err := c.StreamRunEvents(ctx, runID)
 	if err != nil {
 		return nil, err
 	}
@@ -294,8 +294,8 @@ type SSEEvent struct {
 	Data string
 }
 
-func (c *Client) StreamRunEventsChan(runID string) (<-chan SSEEvent, error) {
-	resp, err := c.StreamRunEvents(runID)
+func (c *Client) StreamRunEventsChan(ctx context.Context, runID string) (<-chan SSEEvent, error) {
+	resp, err := c.StreamRunEvents(ctx, runID)
 	if err != nil {
 		return nil, err
 	}
@@ -363,8 +363,8 @@ func (c *Client) StreamRunEventsChan(runID string) (<-chan SSEEvent, error) {
 	return ch, nil
 }
 
-func (c *Client) CreateAPIKey(name string) (*APIKeyInfo, error) {
-	resp, err := c.postJSON("/api/v1/api-keys", map[string]string{"name": name})
+func (c *Client) CreateAPIKey(ctx context.Context, name string) (*APIKeyInfo, error) {
+	resp, err := c.postJSON(ctx, "/api/v1/api-keys", map[string]string{"name": name})
 	if err != nil {
 		return nil, err
 	}
@@ -375,8 +375,8 @@ func (c *Client) CreateAPIKey(name string) (*APIKeyInfo, error) {
 	return &key, nil
 }
 
-func (c *Client) ListAPIKeys() ([]APIKeyInfo, error) {
-	resp, err := c.get("/api/v1/api-keys")
+func (c *Client) ListAPIKeys(ctx context.Context) ([]APIKeyInfo, error) {
+	resp, err := c.get(ctx, "/api/v1/api-keys")
 	if err != nil {
 		return nil, err
 	}
@@ -387,8 +387,8 @@ func (c *Client) ListAPIKeys() ([]APIKeyInfo, error) {
 	return keys, nil
 }
 
-func (c *Client) RevokeAPIKey(id string) error {
-	resp, err := c.delete("/api/v1/api-keys/" + url.PathEscape(id))
+func (c *Client) RevokeAPIKey(ctx context.Context, id string) error {
+	resp, err := c.delete(ctx, "/api/v1/api-keys/"+url.PathEscape(id))
 	if err != nil {
 		return err
 	}
