@@ -48,12 +48,14 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) callback(w http.ResponseWriter, r *http.Request) {
 	stateCookie, err := r.Cookie("oauth_state")
 	if err != nil {
+		slog.Error("callback: missing state cookie", "cookies", r.Cookies(), "error", err)
 		http.Error(w, "missing state cookie", http.StatusBadRequest)
 		return
 	}
 
 	returnedState := r.URL.Query().Get("state")
 	if returnedState == "" || returnedState != stateCookie.Value {
+		slog.Error("callback: state mismatch", "returned", returnedState, "cookie", stateCookie.Value)
 		http.Error(w, "invalid state parameter", http.StatusBadRequest)
 		return
 	}
