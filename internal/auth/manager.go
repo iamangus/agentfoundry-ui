@@ -334,6 +334,8 @@ func (m *Manager) redirectToLogin(w http.ResponseWriter, r *http.Request) {
 	scheme := "http"
 	if r.TLS != nil {
 		scheme = "https"
+	} else if proto := r.Header.Get("X-Forwarded-Proto"); proto == "https" {
+		scheme = "https"
 	}
 	callbackURL := scheme + "://" + r.Host + "/auth/callback"
 
