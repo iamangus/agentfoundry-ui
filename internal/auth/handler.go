@@ -39,11 +39,7 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 		MaxAge:   600,
 	})
 
-	scheme := "http"
-	if r.TLS != nil {
-		scheme = "https"
-	}
-	callbackURL := scheme + "://" + r.Host + "/auth/callback"
+	callbackURL := schemeForRequest(r) + "://" + r.Host + "/auth/callback"
 
 	loginURL := h.mgr.LoginURL(state, callbackURL)
 	http.Redirect(w, r, loginURL, http.StatusFound)
@@ -75,11 +71,7 @@ func (h *Handler) callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	scheme := "http"
-	if r.TLS != nil {
-		scheme = "https"
-	}
-	redirectURL := scheme + "://" + r.Host + "/auth/callback"
+	redirectURL := schemeForRequest(r) + "://" + r.Host + "/auth/callback"
 
 	sd, err := h.mgr.ExchangeCode(r.Context(), code, redirectURL)
 	if err != nil {
@@ -111,7 +103,7 @@ func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
 	base := strings.TrimRight(h.cfg.KeycloakURL, "/")
 	logoutURL := fmt.Sprintf("%s/realms/%s/protocol/openid-connect/logout?client_id=%s&post_logout_redirect_uri=%s",
 		base, h.cfg.KeycloakRealm, h.cfg.KeycloakClientID,
-		"http://"+r.Host+"/auth/login",
+		schemeForRequest(r)+"://"+r.Host+"/auth/login",
 	)
 
 	http.SetCookie(w, &http.Cookie{

@@ -228,6 +228,16 @@ func (m *Manager) cleanupExpired() {
 	}
 }
 
+func schemeForRequest(r *http.Request) string {
+	if r.TLS != nil {
+		return "https"
+	}
+	if proto := r.Header.Get("X-Forwarded-Proto"); proto == "https" {
+		return "https"
+	}
+	return "http"
+}
+
 func extractClaim(claims map[string]any, path string) []string {
 	parts := strings.Split(path, ".")
 	var current any = claims
@@ -331,13 +341,7 @@ func (m *Manager) redirectToLogin(w http.ResponseWriter, r *http.Request) {
 		MaxAge:   600,
 	})
 
-	scheme := "http"
-	if r.TLS != nil {
-		scheme = "https"
-	} else if proto := r.Header.Get("X-Forwarded-Proto"); proto == "https" {
-		scheme = "https"
-	}
-	callbackURL := scheme + "://" + r.Host + "/auth/callback"
+	callbackURL := schemeForRequest(r) + "://" + r.Host + "/auth/callback"
 
 	loginURL := m.LoginURL(state, callbackURL)
 	slog.Info("serving login page", "login_url", loginURL)
