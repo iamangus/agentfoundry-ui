@@ -55,14 +55,21 @@
     }
 
     .agent-row {
-      display: flex; align-items: center; justify-content: space-between;
+      display: flex; align-items: center; position: relative;
       padding: 8px 10px; border-radius: 8px; margin: 2px 0;
       cursor: pointer; transition: background 0.12s, border-color 0.12s;
       border: 1px solid transparent; text-decoration: none; color: inherit;
     }
     .agent-row:hover { background: var(--bg-card); color: var(--text-base); }
     .agent-row.active { background: var(--purple-dim); border-color: oklch(59.1% 0.249 292.7 / 0.25); }
-    .agent-row .agent-actions { opacity: 0; transition: opacity 0.15s; flex-shrink: 0; display: flex; gap: 4px; }
+    .agent-row .agent-actions {
+      position: absolute; right: 4px;
+      opacity: 0; transition: opacity 0.15s;
+      display: flex; gap: 4px;
+      background: var(--bg-card);
+      padding-left: 8px;
+      border-radius: 0 8px 8px 0;
+    }
     .agent-row:hover .agent-actions { opacity: 1; }
     .agent-name { font-size: 0.82rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .agent-desc { font-size: 0.75rem; color: var(--text-muted); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
