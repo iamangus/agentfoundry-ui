@@ -157,7 +157,15 @@ func (m *Manager) ExchangeCode(ctx context.Context, code, redirectURL string) (*
 	for _, g := range groups {
 		t := strings.TrimPrefix(g, "/")
 		if t != "" && !strings.Contains(t, "/") {
-			teams = append(teams, t)
+			if m.cfg.TeamPrefix != "" {
+				if !strings.HasPrefix(t, m.cfg.TeamPrefix) {
+					continue
+				}
+				t = strings.TrimPrefix(t, m.cfg.TeamPrefix)
+			}
+			if t != "" {
+				teams = append(teams, t)
+			}
 		}
 	}
 

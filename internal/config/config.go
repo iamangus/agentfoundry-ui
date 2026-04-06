@@ -14,6 +14,7 @@ type Config struct {
 
 	AdminRole     string
 	TeamAdminRole string
+	TeamPrefix    string
 }
 
 func Load() *Config {
@@ -39,6 +40,7 @@ func Load() *Config {
 
 		AdminRole:     envOrDefault("AUTH_ADMIN_ROLES", "opendev-admin"),
 		TeamAdminRole: envOrDefault("AUTH_TEAM_ADMIN_ROLE", "team-admin"),
+		TeamPrefix:    os.Getenv("AUTH_TEAM_PREFIX"),
 	}
 }
 
