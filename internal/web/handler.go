@@ -47,6 +47,7 @@ type postMessageData struct {
 type agentsPageData struct {
 	ActivePage string
 	Agents     []*api.Definition
+	Groups     agentGroups
 	User       *UserInfoData
 }
 
@@ -59,6 +60,31 @@ type agentEditorData struct {
 type saveYamlData struct {
 	Editor agentEditorData
 	Agents []*api.Definition
+	Groups agentGroups
+}
+
+type agentGroups struct {
+	Personal []*api.Definition
+	Team     []*api.Definition
+	Global   []*api.Definition
+}
+
+func groupAgents(agents []*api.Definition) agentGroups {
+	sort.Slice(agents, func(i, j int) bool {
+		return agents[i].Name < agents[j].Name
+	})
+	var g agentGroups
+	for _, a := range agents {
+		switch a.Scope {
+		case "team":
+			g.Team = append(g.Team, a)
+		case "global":
+			g.Global = append(g.Global, a)
+		default:
+			g.Personal = append(g.Personal, a)
+		}
+	}
+	return g
 }
 
 type toolsPageData struct {
@@ -378,6 +404,7 @@ func (h *Handler) agentsPage(w http.ResponseWriter, r *http.Request) {
 	data := agentsPageData{
 		ActivePage: "agents",
 		Agents:     agents,
+		Groups:     groupAgents(agents),
 		User:       h.userFromRequest(r),
 	}
 	h.render(w, "agents.html", data)
@@ -392,6 +419,7 @@ func (h *Handler) agentListPartial(w http.ResponseWriter, r *http.Request) {
 	}
 	data := agentsPageData{
 		Agents: agents,
+		Groups: groupAgents(agents),
 		User:   h.userFromRequest(r),
 	}
 	h.renderPartial(w, "agent-list-items", data)
@@ -439,9 +467,11 @@ func (h *Handler) saveAgentForm(w http.ResponseWriter, r *http.Request) {
 	}
 
 	agents, _ := h.client.ListAgents(r.Context())
+	groups := groupAgents(agents)
 	h.renderPartial(w, "save-agent-response", saveYamlData{
 		Editor: agentEditorData{Def: saved, StructuredOutputJSON: structuredOutputJSON(saved), User: h.userFromRequest(r)},
 		Agents: agents,
+		Groups: groups,
 	})
 }
 
@@ -466,9 +496,11 @@ func (h *Handler) createAgentFormNew(w http.ResponseWriter, r *http.Request) {
 	}
 
 	agents, _ := h.client.ListAgents(r.Context())
+	groups := groupAgents(agents)
 	h.renderPartial(w, "save-agent-response", saveYamlData{
 		Editor: agentEditorData{Def: saved, StructuredOutputJSON: structuredOutputJSON(saved), User: h.userFromRequest(r)},
 		Agents: agents,
+		Groups: groups,
 	})
 }
 
@@ -508,9 +540,11 @@ func (h *Handler) cloneAgent(w http.ResponseWriter, r *http.Request) {
 	}
 
 	agents, _ = h.client.ListAgents(r.Context())
+	groups := groupAgents(agents)
 	h.renderPartial(w, "save-agent-response", saveYamlData{
 		Editor: agentEditorData{Def: saved, StructuredOutputJSON: structuredOutputJSON(saved), User: h.userFromRequest(r)},
 		Agents: agents,
+		Groups: groups,
 	})
 }
 
@@ -522,7 +556,7 @@ func (h *Handler) deleteAgentWeb(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	agents, _ := h.client.ListAgents(r.Context())
-	h.renderPartial(w, "agent-list-items", agentsPageData{Agents: agents})
+	h.renderPartial(w, "agent-list-items", agentsPageData{Agents: agents, Groups: groupAgents(agents)})
 }
 
 func (h *Handler) toolsPage(w http.ResponseWriter, r *http.Request) {
