@@ -16,6 +16,7 @@ async function request(method, path, body) {
     }
     throw new Error(msg || res.statusText)
   }
+  if (res.status === 204 || res.headers.get('content-length') === '0') return null
   return res.json()
 }
 
