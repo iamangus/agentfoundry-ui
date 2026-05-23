@@ -639,6 +639,11 @@ func (h *Handler) apiKeysPage(w http.ResponseWriter, r *http.Request) {
 	}
 	data.Keys = keyData
 
+	if r.Header.Get("HX-Request") == "true" {
+		h.renderPartial(w, "api-key-list", data)
+		return
+	}
+
 	h.render(w, "api-keys.html", data)
 }
 
