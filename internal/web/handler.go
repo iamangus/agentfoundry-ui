@@ -2,14 +2,11 @@ package web
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
-	"sort"
-	"strings"
 
 	"github.com/angoo/agentfoundry-ui/internal/api"
 )
@@ -44,9 +41,6 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /agents/form", h.jsonCreateAgent)
 	mux.HandleFunc("POST /agents/{name}/clone", h.jsonCloneAgent)
 	mux.HandleFunc("DELETE /agents/{name}", h.jsonDeleteAgent)
-
-	mux.HandleFunc("GET /tools/list", h.jsonToolList)
-	mux.HandleFunc("POST /tools/generate", h.jsonToolGenerate)
 
 	mux.HandleFunc("GET /tools/servers/list", h.jsonMCPServerList)
 	mux.HandleFunc("POST /tools/servers", h.jsonCreateMCPServer)
@@ -279,41 +273,6 @@ func (h *Handler) jsonDeleteAgent(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (h *Handler) jsonToolList(w http.ResponseWriter, r *http.Request) {
-	servers, err := h.buildServerTools(r.Context())
-	if err != nil {
-		slog.Error("failed to list tools", "error", err)
-		http.Error(w, "backend error", http.StatusBadGateway)
-		return
-	}
-	writeJSON(w, servers)
-}
-
-func (h *Handler) jsonToolGenerate(w http.ResponseWriter, r *http.Request) {
-	var tools []string
-	if err := json.NewDecoder(r.Body).Decode(&tools); err != nil {
-		http.Error(w, "invalid JSON: expected string array", http.StatusBadRequest)
-		return
-	}
-	sort.Strings(tools)
-
-	var buf strings.Builder
-	if len(tools) > 0 {
-		buf.WriteString("tools:\n")
-		for _, t := range tools {
-			buf.WriteString("  - ")
-			buf.WriteString(t)
-			buf.WriteString("\n")
-		}
-	}
-
-	writeJSON(w, map[string]any{
-		"yaml":     buf.String(),
-		"selected": len(tools),
-		"lines":    len(tools) + 1,
-	})
-}
-
 func (h *Handler) jsonMCPServerList(w http.ResponseWriter, r *http.Request) {
 	servers, err := h.client.ListMCPServers(r.Context())
 	if err != nil {
@@ -482,30 +441,6 @@ func (h *Handler) proxyBackend(w http.ResponseWriter, r *http.Request) {
 	io.Copy(w, resp.Body)
 }
 
-func (h *Handler) buildServerTools(ctx context.Context) ([]serverTools, error) {
-	allTools, err := h.client.ListTools(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	byServer := make(map[string][]toolInfo)
-	for _, t := range allTools {
-		byServer[t.Server] = append(byServer[t.Server], toolInfo{
-			QualifiedName: t.QualifiedName,
-			Server:        t.Server,
-			Name:          t.Name,
-			Description:   t.Description,
-		})
-	}
-
-	servers := make([]serverTools, 0, len(byServer))
-	for srv, tools := range byServer {
-		servers = append(servers, serverTools{Name: srv, Tools: tools})
-	}
-	sort.Slice(servers, func(i, j int) bool { return servers[i].Name < servers[j].Name })
-	return servers, nil
-}
-
 func writeJSON(w http.ResponseWriter, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(v); err != nil {
@@ -547,18 +482,6 @@ func definitionFromJSON(r *http.Request) (*api.Definition, error) {
 		StructuredOutput:   formData.StructuredOutput,
 	}
 	return def, nil
-}
-
-type toolInfo struct {
-	QualifiedName string `json:"qualified_name"`
-	Server        string `json:"server"`
-	Name          string `json:"name"`
-	Description   string `json:"description"`
-}
-
-type serverTools struct {
-	Name  string     `json:"name"`
-	Tools []toolInfo `json:"tools"`
 }
 
 func cloneAgentName(src string, exists func(string) bool) (string, error) {

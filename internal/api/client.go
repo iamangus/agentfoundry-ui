@@ -12,13 +12,6 @@ import (
 	"time"
 )
 
-type ToolInfo struct {
-	QualifiedName string `json:"qualified_name"`
-	Server        string `json:"server"`
-	Name          string `json:"name"`
-	Description   string `json:"description"`
-}
-
 type Session struct {
 	ID          string    `json:"id"`
 	AgentName   string    `json:"agent_name"`
@@ -239,18 +232,6 @@ func (c *Client) DeleteAgent(ctx context.Context, name string) error {
 		return fmt.Errorf("delete agent: %s", resp.Status)
 	}
 	return nil
-}
-
-func (c *Client) ListTools(ctx context.Context) ([]ToolInfo, error) {
-	resp, err := c.get(ctx, "/api/v1/tools")
-	if err != nil {
-		return nil, err
-	}
-	var tools []ToolInfo
-	if err := c.decodeJSON(resp, &tools); err != nil {
-		return nil, err
-	}
-	return tools, nil
 }
 
 func (c *Client) CreateSession(ctx context.Context, agentName string) (*Session, error) {
