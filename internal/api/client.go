@@ -393,7 +393,7 @@ func (c *Client) RevokeAPIKey(ctx context.Context, id string) error {
 		return err
 	}
 	resp.Body.Close()
-	if resp.StatusCode >= 400 {
+	if resp.StatusCode >= 400 && resp.StatusCode != 404 && resp.StatusCode != 410 {
 		return fmt.Errorf("revoke api key: %s", resp.Status)
 	}
 	return nil

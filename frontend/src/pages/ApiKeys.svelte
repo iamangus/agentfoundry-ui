@@ -52,10 +52,11 @@
     if (!confirm('Revoke this API key?')) return
     try {
       await api.del('/api-keys/' + id)
-      await loadKeys()
     } catch (e) {
       console.error('Failed to revoke key', e)
     }
+    keys = keys.filter(k => k.id !== id)
+    await loadKeys()
   }
 
   function copyKey(key) {
