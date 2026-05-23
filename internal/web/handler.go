@@ -1,6 +1,7 @@
 package web
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -50,6 +51,8 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/keys", h.jsonAPIKeysList)
 	mux.HandleFunc("POST /api/keys", h.jsonCreateAPIKey)
 	mux.HandleFunc("DELETE /api/keys/{id}", h.jsonRevokeAPIKey)
+
+	mux.HandleFunc("/api/v1/", h.proxyBackend)
 
 	slog.Info("web UI routes registered")
 }
@@ -343,6 +346,32 @@ func (h *Handler) jsonRevokeAPIKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) proxyBackend(w http.ResponseWriter, r *http.Request) {
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		slog.Error("failed to read proxy request body", "error", err)
+		http.Error(w, "proxy error", http.StatusBadGateway)
+		return
+	}
+	defer r.Body.Close()
+
+	resp, err := h.client.Proxy(r.Context(), r.Method, r.URL.Path, r.URL.RawQuery, bytes.NewReader(body), r.Header.Get("Content-Type"))
+	if err != nil {
+		slog.Error("proxy request failed", "method", r.Method, "path", r.URL.Path, "error", err)
+		http.Error(w, "proxy error", http.StatusBadGateway)
+		return
+	}
+	defer resp.Body.Close()
+
+	for k, v := range resp.Header {
+		for _, vv := range v {
+			w.Header().Add(k, vv)
+		}
+	}
+	w.WriteHeader(resp.StatusCode)
+	io.Copy(w, resp.Body)
 }
 
 func (h *Handler) buildServerTools(ctx context.Context) ([]serverTools, error) {

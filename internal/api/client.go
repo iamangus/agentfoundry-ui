@@ -398,3 +398,19 @@ func (c *Client) RevokeAPIKey(ctx context.Context, id string) error {
 	}
 	return nil
 }
+
+func (c *Client) Proxy(ctx context.Context, method, path, query string, body io.Reader, contentType string) (*http.Response, error) {
+	u := c.baseURL.JoinPath(path)
+	if query != "" {
+		u.RawQuery = query
+	}
+	req, err := http.NewRequestWithContext(ctx, method, u.String(), body)
+	if err != nil {
+		return nil, err
+	}
+	if contentType != "" {
+		req.Header.Set("Content-Type", contentType)
+	}
+	c.withAuth(req)
+	return c.httpClient.Do(req)
+}

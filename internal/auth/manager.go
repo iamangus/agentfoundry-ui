@@ -427,6 +427,14 @@ func (m *Manager) Middleware(next http.Handler) http.Handler {
 			return
 		}
 
+		authHeader := r.Header.Get("Authorization")
+		if strings.HasPrefix(authHeader, "Bearer ") {
+			token := authHeader[len("Bearer "):]
+			ctx := ContextWithAccessToken(r.Context(), token)
+			next.ServeHTTP(w, r.WithContext(ctx))
+			return
+		}
+
 		clearCookie := func() {
 			http.SetCookie(w, &http.Cookie{
 				Name:   "session",

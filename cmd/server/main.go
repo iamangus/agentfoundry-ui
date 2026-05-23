@@ -39,9 +39,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if authMgr.Enabled() {
-		handler.Client().SetTokenProvider(&contextTokenProvider{})
-	}
+	handler.Client().SetTokenProvider(&contextTokenProvider{})
 
 	distFS, err := fs.Sub(frontend.Dist, "dist")
 	if err != nil {
