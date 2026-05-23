@@ -132,7 +132,7 @@
       <div class="full-key-display" id="full-key-value"></div>
       <p class="warning-text">Copy this key now. It cannot be shown again.</p>
       <button id="copy-key-btn" class="btn-primary" style="width:100%; margin-top:16px;" onclick="copyKey()">Copy</button>
-      <button style="width:100%; margin-top:8px; padding:8px; background:transparent; border:1px solid var(--border); border-radius:8px; color:var(--text-muted); font-family:inherit; font-size:0.85rem; cursor:pointer;" onclick="closeKeyModal()">Close</button>
+      <button id="close-key-btn" style="width:100%; margin-top:8px; padding:8px; background:transparent; border:1px solid var(--border); border-radius:8px; color:var(--text-muted); font-family:inherit; font-size:0.85rem; cursor:pointer;" onclick="closeKeyModal()">Close</button>
     </div>
     <button style="width:100%; margin-top:12px; padding:8px; background:transparent; border:1px solid var(--border); border-radius:8px; color:var(--text-muted); font-family:inherit; font-size:0.85rem; cursor:pointer;" onclick="document.getElementById('new-key-modal').style.display='none'; document.getElementById('key-create-form').style.display='block'; document.getElementById('key-result').style.display='none';">
       Cancel
@@ -162,58 +162,91 @@ function createKey() {
 
 function copyKey() {
   var key = document.getElementById('full-key-value').textContent;
-  var btn = document.getElementById('copy-key-btn');
 
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(key).then(function() {
-      btn.textContent = 'Copied!';
-    }).catch(function() {
-      fallbackCopy(key, btn);
-    });
-  } else {
-    fallbackCopy(key, btn);
+  function done() {
+    var btn = document.getElementById('copy-key-btn');
+    if (btn) btn.textContent = 'Copied!';
+  }
+
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(key).then(done).catch(function() {
+        fallbackCopy(key);
+      });
+    } else {
+      fallbackCopy(key);
+    }
+  } catch(e) {
+    fallbackCopy(key);
   }
 }
 
-function fallbackCopy(text, btn) {
+function fallbackCopy(text) {
   var el = document.createElement('textarea');
   el.value = text;
   el.style.position = 'fixed';
   el.style.left = '-9999px';
+  el.style.top = '0';
   document.body.appendChild(el);
+  el.focus();
   el.select();
   var ok = false;
   try { ok = document.execCommand('copy'); } catch(e) {}
   document.body.removeChild(el);
-  if (ok) {
+  var btn = document.getElementById('copy-key-btn');
+  if (ok && btn) {
     btn.textContent = 'Copied!';
-  } else {
+  } else if (btn) {
     selectKeyText();
     btn.textContent = 'Copy failed — use Ctrl+C';
   }
 }
 
 function selectKeyText() {
+  var el = document.getElementById('full-key-value');
+  if (!el) return;
   var range = document.createRange();
-  range.selectNodeContents(document.getElementById('full-key-value'));
+  range.selectNodeContents(el);
   var sel = window.getSelection();
   sel.removeAllRanges();
   sel.addRange(range);
 }
 
 function closeKeyModal() {
-  document.getElementById('new-key-modal').style.display = 'none';
-  document.getElementById('key-create-form').style.display = 'block';
-  document.getElementById('key-result').style.display = 'none';
-  document.getElementById('key-name').value = '';
+  var modal = document.getElementById('new-key-modal');
+  var form = document.getElementById('key-create-form');
+  var result = document.getElementById('key-result');
+  var nameInput = document.getElementById('key-name');
   var btn = document.getElementById('copy-key-btn');
-  btn.textContent = 'Copy';
+  if (modal) modal.style.display = 'none';
+  if (form) form.style.display = 'block';
+  if (result) result.style.display = 'none';
+  if (nameInput) nameInput.value = '';
+  if (btn) btn.textContent = 'Copy';
 }
 
 function revokeKey(id, name) {
   if (!confirm('Revoke key "' + name + '"? This cannot be undone.')) return;
   htmx.ajax('DELETE', '/api-keys/' + id, '#api-key-list');
 }
+
+document.addEventListener('DOMContentLoaded', function() {
+  var copyBtn = document.getElementById('copy-key-btn');
+  if (copyBtn) {
+    copyBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      copyKey();
+    });
+  }
+
+  var closeModalBtn = document.getElementById('close-key-btn');
+  if (closeModalBtn) {
+    closeModalBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      closeKeyModal();
+    });
+  }
+});
 </script>
 
 </body>
