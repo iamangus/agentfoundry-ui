@@ -6,6 +6,12 @@ async function request(method, path, body) {
   if (body) opts.body = JSON.stringify(body)
 
   const res = await fetch(path, opts)
+
+  if (res.status === 401) {
+    window.location.href = '/auth/login'
+    throw new Error('Session expired')
+  }
+
   if (!res.ok) {
     let msg = res.statusText
     try {
@@ -15,7 +21,7 @@ async function request(method, path, body) {
         const err = JSON.parse(text)
         msg = err.error || text
       } catch {}
-    } catch {} // body already consumed or empty
+    } catch {}
     throw new Error(msg)
   }
   if (res.status === 204 || res.headers.get('content-length') === '0') return null

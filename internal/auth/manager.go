@@ -29,9 +29,11 @@ type UserInfo struct {
 }
 
 type sessionData struct {
-	AccessToken string
-	UserInfo    UserInfo
-	ExpiresAt   time.Time
+	AccessToken      string
+	RefreshToken     string
+	UserInfo         UserInfo
+	ExpiresAt        time.Time
+	RefreshExpiresAt time.Time
 }
 
 type Manager struct {
@@ -76,7 +78,7 @@ func (m *Manager) Enabled() bool {
 
 func (m *Manager) LoginURL(state, redirectURL string) string {
 	base := strings.TrimRight(m.cfg.KeycloakURL, "/")
-	return fmt.Sprintf("%s/realms/%s/protocol/openid-connect/auth?client_id=%s&redirect_uri=%s&response_type=code&scope=openid+profile+email&state=%s",
+	return fmt.Sprintf("%s/realms/%s/protocol/openid-connect/auth?client_id=%s&redirect_uri=%s&response_type=code&scope=openid+profile+email+offline_access&state=%s",
 		base, m.cfg.KeycloakRealm, m.cfg.KeycloakClientID, redirectURL, state,
 	)
 }
@@ -112,9 +114,11 @@ func (m *Manager) ExchangeCode(ctx context.Context, code, redirectURL string) (*
 	}
 
 	var tokenResp struct {
-		AccessToken string `json:"access_token"`
-		IDToken     string `json:"id_token"`
-		ExpiresIn   int    `json:"expires_in"`
+		AccessToken      string `json:"access_token"`
+		IDToken          string `json:"id_token"`
+		RefreshToken     string `json:"refresh_token"`
+		ExpiresIn        int    `json:"expires_in"`
+		RefreshExpiresIn int    `json:"refresh_expires_in"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&tokenResp); err != nil {
 		return nil, fmt.Errorf("decode token response: %w", err)
@@ -180,10 +184,17 @@ func (m *Manager) ExchangeCode(ctx context.Context, code, redirectURL string) (*
 		Teams:       teams,
 	}
 
+	refreshExpiresAt := time.Now().AddDate(0, 0, 1)
+	if tokenResp.RefreshExpiresIn > 0 {
+		refreshExpiresAt = time.Now().Add(time.Duration(tokenResp.RefreshExpiresIn) * time.Second)
+	}
+
 	sd := &sessionData{
-		AccessToken: tokenResp.AccessToken,
-		UserInfo:    userInfo,
-		ExpiresAt:   time.Now().Add(time.Duration(tokenResp.ExpiresIn) * time.Second),
+		AccessToken:      tokenResp.AccessToken,
+		RefreshToken:     tokenResp.RefreshToken,
+		UserInfo:         userInfo,
+		ExpiresAt:        time.Now().Add(time.Duration(tokenResp.ExpiresIn) * time.Second),
+		RefreshExpiresAt: refreshExpiresAt,
 	}
 
 	return sd, nil
@@ -227,12 +238,100 @@ func (m *Manager) cleanupExpired() {
 		now := time.Now()
 		m.mu.Lock()
 		for id, sd := range m.sessions {
-			if now.After(sd.ExpiresAt) {
+			if now.After(sd.RefreshExpiresAt) {
 				delete(m.sessions, id)
 			}
 		}
 		m.mu.Unlock()
 	}
+}
+
+func (m *Manager) RefreshAccessToken(ctx context.Context, refreshToken string) (*sessionData, error) {
+	tokenURL := fmt.Sprintf("%s/realms/%s/protocol/openid-connect/token",
+		strings.TrimRight(m.cfg.KeycloakURL, "/"), m.cfg.KeycloakRealm)
+
+	data := "grant_type=refresh_token" +
+		"&refresh_token=" + refreshToken +
+		"&client_id=" + m.cfg.KeycloakClientID
+
+	if m.cfg.KeycloakClientSecret != "" {
+		data += "&client_secret=" + m.cfg.KeycloakClientSecret
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, tokenURL, strings.NewReader(data))
+	if err != nil {
+		return nil, fmt.Errorf("refresh request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("token refresh: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("token refresh: %s: %s", resp.Status, string(body))
+	}
+
+	var tokenResp struct {
+		AccessToken      string `json:"access_token"`
+		RefreshToken     string `json:"refresh_token"`
+		ExpiresIn        int    `json:"expires_in"`
+		RefreshExpiresIn int    `json:"refresh_expires_in"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&tokenResp); err != nil {
+		return nil, fmt.Errorf("decode refresh response: %w", err)
+	}
+
+	if tokenResp.AccessToken == "" {
+		return nil, fmt.Errorf("token refresh: no access_token in response")
+	}
+
+	newRefreshToken := refreshToken
+	newRefreshExpiresIn := 0
+	if tokenResp.RefreshToken != "" {
+		newRefreshToken = tokenResp.RefreshToken
+	}
+	if tokenResp.RefreshExpiresIn > 0 {
+		newRefreshExpiresIn = tokenResp.RefreshExpiresIn
+	}
+
+	refreshExpiresAt := time.Now().AddDate(0, 0, 1)
+	if newRefreshExpiresIn > 0 {
+		refreshExpiresAt = time.Now().Add(time.Duration(newRefreshExpiresIn) * time.Second)
+	}
+
+	return &sessionData{
+		AccessToken:      tokenResp.AccessToken,
+		RefreshToken:     newRefreshToken,
+		ExpiresAt:        time.Now().Add(time.Duration(tokenResp.ExpiresIn) * time.Second),
+		RefreshExpiresAt: refreshExpiresAt,
+	}, nil
+}
+
+func isAPIRequest(r *http.Request) bool {
+	path := r.URL.Path
+	if strings.HasPrefix(path, "/chat/sessions") || strings.HasPrefix(path, "/chat/runs") {
+		return true
+	}
+	if strings.HasPrefix(path, "/agents/") {
+		return true
+	}
+	if strings.HasPrefix(path, "/tools/") {
+		return true
+	}
+	if strings.HasPrefix(path, "/api/keys") {
+		return true
+	}
+	return false
+}
+
+func writeUnauthorized(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusUnauthorized)
+	json.NewEncoder(w).Encode(map[string]string{"error": "session expired"})
 }
 
 func schemeForRequest(r *http.Request) string {
@@ -313,27 +412,67 @@ func (m *Manager) Middleware(next http.Handler) http.Handler {
 			return
 		}
 
-		switch r.URL.Path {
-		case "/auth/login", "/auth/callback", "/auth/logout", "/auth/me":
+		if strings.HasPrefix(r.URL.Path, "/auth/") {
 			next.ServeHTTP(w, r)
 			return
 		}
 
-		cookie, err := r.Cookie("session")
-		if err != nil {
-			m.redirectToLogin(w, r)
-			return
-		}
-
-		sd, ok := m.GetSession(cookie.Value)
-		if !ok {
+		clearCookie := func() {
 			http.SetCookie(w, &http.Cookie{
 				Name:   "session",
 				Value:  "",
 				Path:   "/",
 				MaxAge: -1,
 			})
-			m.redirectToLogin(w, r)
+		}
+
+		cookie, err := r.Cookie("session")
+		if err != nil {
+			if isAPIRequest(r) {
+				writeUnauthorized(w)
+			} else {
+				m.redirectToLogin(w, r)
+			}
+			return
+		}
+
+		m.mu.RLock()
+		sd, ok := m.sessions[cookie.Value]
+		m.mu.RUnlock()
+
+		if !ok {
+			clearCookie()
+			if isAPIRequest(r) {
+				writeUnauthorized(w)
+			} else {
+				m.redirectToLogin(w, r)
+			}
+			return
+		}
+
+		if time.Now().After(sd.ExpiresAt) {
+			if sd.RefreshToken != "" && time.Now().Before(sd.RefreshExpiresAt) {
+				newSD, err := m.RefreshAccessToken(r.Context(), sd.RefreshToken)
+				if err == nil {
+					newSD.UserInfo = sd.UserInfo
+					m.mu.Lock()
+					m.sessions[cookie.Value] = newSD
+					m.mu.Unlock()
+					sd = newSD
+				}
+			}
+		}
+
+		if time.Now().After(sd.ExpiresAt) {
+			m.mu.Lock()
+			delete(m.sessions, cookie.Value)
+			m.mu.Unlock()
+			clearCookie()
+			if isAPIRequest(r) {
+				writeUnauthorized(w)
+			} else {
+				m.redirectToLogin(w, r)
+			}
 			return
 		}
 
