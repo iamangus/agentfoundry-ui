@@ -1,0 +1,230 @@
+<script>
+  import { api } from '../lib/api.js'
+
+  let { server = null, onclose, oncreated } = $props()
+
+  let isEdit = $derived(!!server)
+  let saving = $state(false)
+  let error = $state('')
+
+  let formName = $state('')
+  let formUrl = $state('')
+  let formTransport = $state('sse')
+  let formHeaders = $state('')
+  let formScope = $state('user')
+  let formTeam = $state('')
+
+  $effect(() => {
+    if (server) {
+      formName = server.name
+      formUrl = server.url
+      formTransport = server.transport || 'sse'
+      formHeaders = server.headers ? Object.entries(server.headers).map(([k, v]) => `${k}: ${v}`).join('\n') : ''
+      formScope = server.scope || 'user'
+      formTeam = server.team || ''
+    }
+  })
+
+  function close() {
+    onclose()
+  }
+
+  function onkeydown(e) {
+    if (e.key === 'Escape') close()
+  }
+
+  function parseHeaders() {
+    const headers = {}
+    if (formHeaders.trim()) {
+      for (const line of formHeaders.trim().split('\n')) {
+        const idx = line.indexOf(':')
+        if (idx > 0) {
+          const key = line.substring(0, idx).trim()
+          const val = line.substring(idx + 1).trim()
+          if (key) headers[key] = val
+        }
+      }
+    }
+    return headers
+  }
+
+  async function save() {
+    if (!formName.trim() || !formUrl.trim()) {
+      error = 'Name and URL are required'
+      return
+    }
+    saving = true
+    error = ''
+    try {
+      const body = {
+        name: formName.trim(),
+        url: formUrl.trim(),
+        transport: formTransport,
+        headers: parseHeaders(),
+        scope: formScope,
+        team: formScope === 'team' ? formTeam.trim() : ''
+      }
+      await api.post('/tools/servers', body)
+      oncreated()
+    } catch (e) {
+      error = e.message || 'Failed to save'
+    } finally {
+      saving = false
+    }
+  }
+
+  async function update() {
+    if (!formName.trim() || !formUrl.trim()) {
+      error = 'Name and URL are required'
+      return
+    }
+    saving = true
+    error = ''
+    try {
+      const body = {
+        name: formName.trim(),
+        url: formUrl.trim(),
+        transport: formTransport,
+        headers: parseHeaders(),
+        scope: formScope,
+        team: formScope === 'team' ? formTeam.trim() : ''
+      }
+      await api.put('/tools/servers/' + server.name, body)
+      oncreated()
+    } catch (e) {
+      error = e.message || 'Failed to update'
+    } finally {
+      saving = false
+    }
+  }
+</script>
+
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<div class="modal-backdrop" onclick={close} onkeydown={onkeydown}>
+  <!-- svelte-ignore a11y_click_events_have_key_events a11y_interactive_supports_focus -->
+  <div class="modal-card" onclick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" tabindex="-1">
+    <h3 class="modal-title">{isEdit ? 'Edit Server' : 'Register MCP Server'}</h3>
+
+    {#if error}
+      <div class="form-error">{error}</div>
+    {/if}
+
+    <label class="modal-label">Name</label>
+    <input class="sb-input" bind:value={formName} placeholder="my-mcp-server" disabled={isEdit} />
+
+    <label class="modal-label">URL</label>
+    <input class="sb-input" bind:value={formUrl} placeholder="http://localhost:8080/sse" />
+
+    <label class="modal-label">Transport</label>
+    <select class="sb-input" bind:value={formTransport}>
+      <option value="sse">SSE</option>
+      <option value="streamable-http">Streamable HTTP</option>
+    </select>
+
+    <label class="modal-label">Headers (one <code>Key: Value</code> per line)</label>
+    <textarea class="sb-input sb-textarea" bind:value={formHeaders} placeholder="X-API-Key: your-key" rows="3"></textarea>
+
+    <label class="modal-label">Scope</label>
+    <select class="sb-input" bind:value={formScope}>
+      <option value="user">Personal</option>
+      <option value="team">Team</option>
+      <option value="global">Global</option>
+    </select>
+
+    {#if formScope === 'team'}
+      <label class="modal-label">Team name</label>
+      <input class="sb-input" bind:value={formTeam} placeholder="my-team" />
+    {/if}
+
+    <div class="modal-actions">
+      <button onclick={close} class="modal-btn modal-btn-cancel">Cancel</button>
+      <button onclick={isEdit ? update() : save()} class="modal-btn modal-btn-create" disabled={saving}>
+        {saving ? 'Saving...' : isEdit ? 'Update' : 'Register'}
+      </button>
+    </div>
+  </div>
+</div>
+
+<style>
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+  }
+  .modal-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    width: 440px;
+    max-width: 90vw;
+    max-height: 85vh;
+    overflow-y: auto;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+  }
+  .modal-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    margin: 0 0 16px 0;
+  }
+  .modal-label {
+    display: block;
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    margin: 12px 0 6px 0;
+  }
+  .modal-label:first-of-type {
+    margin-top: 0;
+  }
+  .modal-label code {
+    font-size: 0.72rem;
+    background: rgba(124,58,237,0.12);
+    padding: 1px 4px;
+    border-radius: 3px;
+  }
+  .sb-textarea {
+    resize: vertical;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.8rem;
+  }
+  .form-error {
+    padding: 8px 12px;
+    background: var(--red-dim);
+    border: 1px solid var(--red-border);
+    border-radius: 8px;
+    color: var(--red-text);
+    font-size: 0.82rem;
+    margin-bottom: 12px;
+  }
+  .modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 20px;
+  }
+  .modal-btn {
+    padding: 7px 16px;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 0.82rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.12s, opacity 0.12s;
+    border: 1px solid var(--border);
+    background: var(--bg-card);
+    color: var(--text-base);
+  }
+  .modal-btn-cancel:hover { background: var(--bg-sidebar); }
+  .modal-btn-create {
+    background: var(--purple-solid);
+    border-color: transparent;
+    color: #fff;
+  }
+  .modal-btn-create:hover { opacity: 0.85; }
+  .modal-btn-create:disabled { opacity: 0.45; cursor: not-allowed; }
+</style>

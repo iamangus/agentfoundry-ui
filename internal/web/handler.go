@@ -48,6 +48,14 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /tools/list", h.jsonToolList)
 	mux.HandleFunc("POST /tools/generate", h.jsonToolGenerate)
 
+	mux.HandleFunc("GET /tools/servers/list", h.jsonMCPServerList)
+	mux.HandleFunc("POST /tools/servers", h.jsonCreateMCPServer)
+	mux.HandleFunc("GET /tools/servers/{name}", h.jsonGetMCPServer)
+	mux.HandleFunc("PUT /tools/servers/{name}", h.jsonUpdateMCPServer)
+	mux.HandleFunc("DELETE /tools/servers/{name}", h.jsonDeleteMCPServer)
+	mux.HandleFunc("PUT /tools/servers/{name}/tools/{tool}", h.jsonSetToolScope)
+	mux.HandleFunc("POST /tools/servers/{name}/refresh", h.jsonRefreshMCPServer)
+
 	mux.HandleFunc("GET /api/keys", h.jsonAPIKeysList)
 	mux.HandleFunc("POST /api/keys", h.jsonCreateAPIKey)
 	mux.HandleFunc("DELETE /api/keys/{id}", h.jsonRevokeAPIKey)
@@ -304,6 +312,106 @@ func (h *Handler) jsonToolGenerate(w http.ResponseWriter, r *http.Request) {
 		"selected": len(tools),
 		"lines":    len(tools) + 1,
 	})
+}
+
+func (h *Handler) jsonMCPServerList(w http.ResponseWriter, r *http.Request) {
+	servers, err := h.client.ListMCPServers(r.Context())
+	if err != nil {
+		slog.Error("failed to list mcp servers", "error", err)
+		http.Error(w, "backend error", http.StatusBadGateway)
+		return
+	}
+	writeJSON(w, servers)
+}
+
+func (h *Handler) jsonCreateMCPServer(w http.ResponseWriter, r *http.Request) {
+	var req api.CreateMCPServerRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+	if req.Name == "" || req.URL == "" {
+		http.Error(w, "name and url are required", http.StatusBadRequest)
+		return
+	}
+	if req.Transport == "" {
+		req.Transport = "sse"
+	}
+	if req.Scope == "" {
+		req.Scope = "user"
+	}
+
+	server, err := h.client.CreateMCPServer(r.Context(), req)
+	if err != nil {
+		slog.Error("failed to create mcp server", "name", req.Name, "error", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, server)
+}
+
+func (h *Handler) jsonGetMCPServer(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	server, err := h.client.GetMCPServer(r.Context(), name)
+	if err != nil {
+		slog.Error("failed to get mcp server", "name", name, "error", err)
+		http.Error(w, "mcp server not found", http.StatusNotFound)
+		return
+	}
+	writeJSON(w, server)
+}
+
+func (h *Handler) jsonUpdateMCPServer(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	var req api.CreateMCPServerRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	server, err := h.client.UpdateMCPServer(r.Context(), name, req)
+	if err != nil {
+		slog.Error("failed to update mcp server", "name", name, "error", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, server)
+}
+
+func (h *Handler) jsonDeleteMCPServer(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	if err := h.client.DeleteMCPServer(r.Context(), name); err != nil {
+		slog.Error("failed to delete mcp server", "name", name, "error", err)
+		http.Error(w, "failed to delete", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) jsonSetToolScope(w http.ResponseWriter, r *http.Request) {
+	serverName := r.PathValue("name")
+	toolName := r.PathValue("tool")
+	var req api.SetToolScopeRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+	if err := h.client.SetToolScope(r.Context(), serverName, toolName, req); err != nil {
+		slog.Error("failed to set tool scope", "server", serverName, "tool", toolName, "error", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, map[string]string{"status": "ok"})
+}
+
+func (h *Handler) jsonRefreshMCPServer(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	if err := h.client.RefreshMCPServer(r.Context(), name); err != nil {
+		slog.Error("failed to refresh mcp server", "name", name, "error", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, map[string]string{"status": "ok"})
 }
 
 func (h *Handler) jsonAPIKeysList(w http.ResponseWriter, r *http.Request) {

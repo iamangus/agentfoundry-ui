@@ -47,6 +47,42 @@ type APIKeyInfo struct {
 	ExpiresAt  *time.Time `json:"expires_at,omitempty"`
 }
 
+type MCPServerInfo struct {
+	ID        string            `json:"id"`
+	Name      string            `json:"name"`
+	URL       string            `json:"url"`
+	Transport string            `json:"transport"`
+	Headers   map[string]string `json:"headers,omitempty"`
+	Scope     string            `json:"scope"`
+	Team      string            `json:"team,omitempty"`
+	CreatedBy string            `json:"created_by"`
+	CreatedAt string            `json:"created_at"`
+	UpdatedAt string            `json:"updated_at"`
+	Connected bool              `json:"connected"`
+	Tools     []MCPServerTool   `json:"tools"`
+}
+
+type MCPServerTool struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Scope       string `json:"scope"`
+	ScopeSource string `json:"scope_source"`
+}
+
+type CreateMCPServerRequest struct {
+	Name      string            `json:"name"`
+	URL       string            `json:"url"`
+	Transport string            `json:"transport"`
+	Headers   map[string]string `json:"headers,omitempty"`
+	Scope     string            `json:"scope"`
+	Team      string            `json:"team,omitempty"`
+}
+
+type SetToolScopeRequest struct {
+	Scope string `json:"scope"`
+	Team  string `json:"team,omitempty"`
+}
+
 type TokenProvider interface {
 	GetAccessToken(ctx context.Context) string
 }
@@ -395,6 +431,90 @@ func (c *Client) RevokeAPIKey(ctx context.Context, id string) error {
 	resp.Body.Close()
 	if resp.StatusCode >= 400 && resp.StatusCode != 404 && resp.StatusCode != 410 {
 		return fmt.Errorf("revoke api key: %s", resp.Status)
+	}
+	return nil
+}
+
+func (c *Client) ListMCPServers(ctx context.Context) ([]MCPServerInfo, error) {
+	resp, err := c.get(ctx, "/api/v1/mcp-servers")
+	if err != nil {
+		return nil, err
+	}
+	var servers []MCPServerInfo
+	if err := c.decodeJSON(resp, &servers); err != nil {
+		return nil, err
+	}
+	return servers, nil
+}
+
+func (c *Client) CreateMCPServer(ctx context.Context, req CreateMCPServerRequest) (*MCPServerInfo, error) {
+	resp, err := c.postJSON(ctx, "/api/v1/mcp-servers", req)
+	if err != nil {
+		return nil, err
+	}
+	var server MCPServerInfo
+	if err := c.decodeJSON(resp, &server); err != nil {
+		return nil, err
+	}
+	return &server, nil
+}
+
+func (c *Client) GetMCPServer(ctx context.Context, name string) (*MCPServerInfo, error) {
+	resp, err := c.get(ctx, "/api/v1/mcp-servers/"+url.PathEscape(name))
+	if err != nil {
+		return nil, err
+	}
+	var server MCPServerInfo
+	if err := c.decodeJSON(resp, &server); err != nil {
+		return nil, err
+	}
+	return &server, nil
+}
+
+func (c *Client) UpdateMCPServer(ctx context.Context, name string, req CreateMCPServerRequest) (*MCPServerInfo, error) {
+	resp, err := c.putJSON(ctx, "/api/v1/mcp-servers/"+url.PathEscape(name), req)
+	if err != nil {
+		return nil, err
+	}
+	var server MCPServerInfo
+	if err := c.decodeJSON(resp, &server); err != nil {
+		return nil, err
+	}
+	return &server, nil
+}
+
+func (c *Client) DeleteMCPServer(ctx context.Context, name string) error {
+	resp, err := c.delete(ctx, "/api/v1/mcp-servers/"+url.PathEscape(name))
+	if err != nil {
+		return err
+	}
+	resp.Body.Close()
+	if resp.StatusCode >= 400 && resp.StatusCode != 404 {
+		return fmt.Errorf("delete mcp server: %s", resp.Status)
+	}
+	return nil
+}
+
+func (c *Client) SetToolScope(ctx context.Context, serverName, toolName string, req SetToolScopeRequest) error {
+	resp, err := c.putJSON(ctx, "/api/v1/mcp-servers/"+url.PathEscape(serverName)+"/tools/"+url.PathEscape(toolName), req)
+	if err != nil {
+		return err
+	}
+	resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		return fmt.Errorf("set tool scope: %s", resp.Status)
+	}
+	return nil
+}
+
+func (c *Client) RefreshMCPServer(ctx context.Context, name string) error {
+	resp, err := c.postJSON(ctx, "/api/v1/mcp-servers/"+url.PathEscape(name)+"/refresh", nil)
+	if err != nil {
+		return err
+	}
+	resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		return fmt.Errorf("refresh mcp server: %s", resp.Status)
 	}
 	return nil
 }
