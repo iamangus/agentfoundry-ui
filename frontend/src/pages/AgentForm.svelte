@@ -16,40 +16,52 @@
   let soJSON = $state(def.structured_output ? JSON.stringify(def.structured_output, null, 2) : '')
 
   let availableServers = $state([])
-  let serversLoading = $state(true)
+  let availableAgents = $state([])
+  let loading = $state(true)
   let enabledTools = $state({})
   let selectedServers = $state([])
   let expandedServer = $state(null)
+  let subAgents = $state([])
 
   $effect(() => {
-    loadServers()
+    loadAll()
   })
 
-  async function loadServers() {
+  async function loadAll() {
     try {
-      serversLoading = true
-      availableServers = await api.get('/tools/servers/list')
+      loading = true
+      const [servers, agents] = await Promise.all([
+        api.get('/tools/servers/list'),
+        api.get('/agents/list')
+      ])
+      availableServers = servers
+      availableAgents = (agents || []).filter(a => a.name !== def.name)
       initFromDef()
     } catch (e) {
-      console.error('Failed to load MCP servers', e)
+      console.error('Failed to load data', e)
     } finally {
-      serversLoading = false
+      loading = false
     }
   }
 
   function initFromDef() {
     if (!def.tools || def.tools.length === 0) return
     const et = {}
-    for (const qn of def.tools) {
-      const dot = qn.indexOf('.')
-      if (dot === -1) continue
-      const srv = qn.slice(0, dot)
-      const tool = qn.slice(dot + 1)
-      if (!et[srv]) et[srv] = new Set()
-      et[srv].add(tool)
+    const sa = []
+    for (const ref of def.tools) {
+      const dot = ref.indexOf('.')
+      if (dot === -1) {
+        sa.push(ref)
+      } else {
+        const srv = ref.slice(0, dot)
+        const tool = ref.slice(dot + 1)
+        if (!et[srv]) et[srv] = new Set()
+        et[srv].add(tool)
+      }
     }
     enabledTools = et
     selectedServers = Object.keys(et)
+    subAgents = sa
   }
 
   function addServer(name) {
@@ -82,6 +94,15 @@
     enabledTools = et
   }
 
+  function addSubAgent(agentName) {
+    if (subAgents.includes(agentName)) return
+    subAgents = [...subAgents, agentName]
+  }
+
+  function removeSubAgent(agentName) {
+    subAgents = subAgents.filter(a => a !== agentName)
+  }
+
   function getServer(name) {
     return availableServers.find(s => s.name === name)
   }
@@ -103,7 +124,7 @@
   }
 
   function totalEnabledCount() {
-    let count = 0
+    let count = subAgents.length
     for (const s of selectedServers) {
       count += enabledTools[s]?.size || 0
     }
@@ -112,6 +133,10 @@
 
   function availableServerOptions() {
     return availableServers.filter(s => !selectedServers.includes(s.name))
+  }
+
+  function availableAgentOptions() {
+    return availableAgents.filter(a => !subAgents.includes(a.name))
   }
 
   function scopeLabel(srv) {
@@ -123,6 +148,11 @@
     return enabledTools[serverName]?.has(toolName) || false
   }
 
+  function getAgentDesc(agentName) {
+    const a = availableAgents.find(aa => aa.name === agentName)
+    return a?.description || ''
+  }
+
   function handleSave() {
     const tools = []
     for (const s of selectedServers) {
@@ -131,6 +161,9 @@
       for (const t of et) {
         tools.push(s + '.' + t)
       }
+    }
+    for (const a of subAgents) {
+      tools.push(a)
     }
 
     let so = null
@@ -193,107 +226,150 @@
 
     <div class="form-group">
       <div class="tool-section-header">
-        <label class="form-label" style="margin-bottom:0;">Tools</label>
+        <label class="form-label" style="margin-bottom:0;">Tools & Sub-agents</label>
         {#if totalEnabledCount() > 0}
           <span class="tool-count-badge">{totalEnabledCount()} enabled</span>
         {/if}
       </div>
 
-      {#if serversLoading}
-        <p class="tool-hint">Loading servers...</p>
-      {:else if availableServerOptions().length > 0 || selectedServers.length === 0}
-        <div class="tool-add-row">
-          <select class="sb-input tool-server-select" id="server-select">
-            <option value="">-- Select MCP server --</option>
-            {#each availableServerOptions() as srv}
-              <option value={srv.name}>{srv.name} ({srv.tools.length} tools)</option>
-            {/each}
-          </select>
-          <button class="sb-submit" style="width:auto; padding:9px 16px; font-size:0.82rem;" onclick={() => {
-            const sel = document.getElementById('server-select')
-            if (sel && sel.value) { addServer(sel.value); sel.value = '' }
-          }}>Add</button>
-        </div>
+      {#if loading}
+        <p class="tool-hint">Loading...</p>
       {:else}
-        <p class="tool-hint">No MCP servers available. Register one in the Tools tab first.</p>
-      {/if}
+        <div class="tool-section-label">Sub-agents</div>
+        <p class="tool-hint">Use other agents as tools. Call them by name in the agent's system prompt.</p>
 
-      {#if selectedServers.length > 0}
-        <div class="tool-servers-list">
-          {#each selectedServers as srvName}
-            {@const srv = getServer(srvName)}
-            {@const tools = getServerTools(srvName)}
-            {@const orphaned = getOrphanedTools(srvName)}
-            {@const expanded = expandedServer === srvName}
-            <div class="tool-server-card" class:expanded>
-              <div class="tool-server-card-header" onclick={() => expandedServer = expanded ? null : srvName} onkeydown={(e) => { if (e.key === 'Enter') expandedServer = expanded ? null : srvName }} role="button" tabindex="0">
-                <div class="tool-server-card-main">
-                  <span class="tool-server-status" class:connected={srv?.connected} class:disconnected={!srv?.connected}>{srv?.connected ? '●' : '○'}</span>
-                  <span class="tool-server-name">{srvName}</span>
-                  <span class="tool-server-scope scope-{scopeLabel(srv)}">{scopeLabel(srv)}</span>
+        {#if availableAgentOptions().length > 0}
+          <div class="tool-add-row">
+            <select class="sb-input tool-server-select" id="agent-select">
+              <option value="">-- Select agent --</option>
+              {#each availableAgentOptions() as a}
+                <option value={a.name}>{a.name}</option>
+              {/each}
+            </select>
+            <button class="sb-submit" style="width:auto; padding:9px 16px; font-size:0.82rem;" onclick={() => {
+              const sel = document.getElementById('agent-select')
+              if (sel && sel.value) { addSubAgent(sel.value); sel.value = '' }
+            }}>Add</button>
+          </div>
+        {/if}
+
+        {#if subAgents.length > 0}
+          <div class="sub-agent-list">
+            {#each subAgents as agentName}
+              <div class="sub-agent-chip">
+                <span class="sub-agent-icon">🤖</span>
+                <div class="sub-agent-info">
+                  <span class="sub-agent-name">{agentName}</span>
+                  {#if getAgentDesc(agentName)}
+                    <span class="sub-agent-desc">{getAgentDesc(agentName)}</span>
+                  {/if}
                 </div>
-                <div class="tool-server-card-meta">
-                  <span class="tool-server-count">{enabledCount(srvName)}/{tools.length + orphaned.length}</span>
-                  <span class="tool-server-expand">{expanded ? '▾' : '▸'}</span>
-                </div>
+                <button class="sub-agent-remove" onclick={() => removeSubAgent(agentName)} title="Remove">&times;</button>
               </div>
+            {/each}
+          </div>
+        {:else}
+          <p class="tool-hint" style="margin-bottom:16px;">No sub-agents selected.</p>
+        {/if}
 
-              {#if expanded}
-                <div class="tool-server-card-body">
-                  <div class="tool-server-actions">
-                    <button class="action-btn action-btn-delete" onclick={() => removeServer(srvName)}>Remove</button>
+        <div class="tool-divider"></div>
+
+        <div class="tool-section-label">MCP Server Tools</div>
+
+        {#if availableServerOptions().length > 0}
+          <div class="tool-add-row">
+            <select class="sb-input tool-server-select" id="server-select">
+              <option value="">-- Select MCP server --</option>
+              {#each availableServerOptions() as srv}
+                <option value={srv.name}>{srv.name} ({srv.tools.length} tools)</option>
+              {/each}
+            </select>
+            <button class="sb-submit" style="width:auto; padding:9px 16px; font-size:0.82rem;" onclick={() => {
+              const sel = document.getElementById('server-select')
+              if (sel && sel.value) { addServer(sel.value); sel.value = '' }
+            }}>Add</button>
+          </div>
+        {:else if selectedServers.length === 0}
+          <p class="tool-hint">No MCP servers available. Register one in the Tools tab first.</p>
+        {/if}
+
+        {#if selectedServers.length > 0}
+          <div class="tool-servers-list">
+            {#each selectedServers as srvName}
+              {@const srv = getServer(srvName)}
+              {@const tools = getServerTools(srvName)}
+              {@const orphaned = getOrphanedTools(srvName)}
+              {@const expanded = expandedServer === srvName}
+              <div class="tool-server-card" class:expanded>
+                <div class="tool-server-card-header" onclick={() => expandedServer = expanded ? null : srvName} onkeydown={(e) => { if (e.key === 'Enter') expandedServer = expanded ? null : srvName }} role="button" tabindex="0">
+                  <div class="tool-server-card-main">
+                    <span class="tool-server-status" class:connected={srv?.connected} class:disconnected={!srv?.connected}>{srv?.connected ? '●' : '○'}</span>
+                    <span class="tool-server-name">{srvName}</span>
+                    <span class="tool-server-scope scope-{scopeLabel(srv)}">{scopeLabel(srv)}</span>
+                  </div>
+                  <div class="tool-server-card-meta">
+                    <span class="tool-server-count">{enabledCount(srvName)}/{tools.length + orphaned.length}</span>
+                    <span class="tool-server-expand">{expanded ? '▾' : '▸'}</span>
+                  </div>
+                </div>
+
+                {#if expanded}
+                  <div class="tool-server-card-body">
+                    <div class="tool-server-actions">
+                      <button class="action-btn action-btn-delete" onclick={() => removeServer(srvName)}>Remove</button>
+                      {#if tools.length > 0}
+                        <button class="action-btn" onclick={() => {
+                          const et = { ...enabledTools }
+                          et[srvName] = new Set(tools.map(t => t.name))
+                          enabledTools = et
+                        }}>Select All</button>
+                        <button class="action-btn" onclick={() => {
+                          const et = { ...enabledTools }
+                          et[srvName] = new Set()
+                          enabledTools = et
+                        }}>Deselect All</button>
+                      {/if}
+                    </div>
+
                     {#if tools.length > 0}
-                      <button class="action-btn" onclick={() => {
-                        const et = { ...enabledTools }
-                        et[srvName] = new Set(tools.map(t => t.name))
-                        enabledTools = et
-                      }}>Select All</button>
-                      <button class="action-btn" onclick={() => {
-                        const et = { ...enabledTools }
-                        et[srvName] = new Set()
-                        enabledTools = et
-                      }}>Deselect All</button>
+                      <div class="tool-checkboxes">
+                        {#each tools as tool}
+                          <label class="tool-checkbox-label">
+                            <input
+                              type="checkbox"
+                              checked={isChecked(srvName, tool.name)}
+                              onchange={() => toggleTool(srvName, tool.name)}
+                            />
+                            <span class="tool-checkbox-name">{tool.name}</span>
+                            <span class="tool-checkbox-desc">{tool.description || ''}</span>
+                          </label>
+                        {/each}
+                      </div>
+                    {:else}
+                      <p class="tool-hint" style="padding:8px 0;">No tools discovered from this server.</p>
+                    {/if}
+
+                    {#if orphaned.length > 0}
+                      <div class="tool-orphaned-section">
+                        <span class="tool-orphaned-label">Previously enabled (no longer on server):</span>
+                        {#each orphaned as tool}
+                          <label class="tool-checkbox-label tool-orphaned">
+                            <input
+                              type="checkbox"
+                              checked={true}
+                              onchange={() => toggleTool(srvName, tool)}
+                            />
+                            <span class="tool-checkbox-name">{tool}</span>
+                          </label>
+                        {/each}
+                      </div>
                     {/if}
                   </div>
-
-                  {#if tools.length > 0}
-                    <div class="tool-checkboxes">
-                      {#each tools as tool}
-                        <label class="tool-checkbox-label">
-                          <input
-                            type="checkbox"
-                            checked={isChecked(srvName, tool.name)}
-                            onchange={() => toggleTool(srvName, tool.name)}
-                          />
-                          <span class="tool-checkbox-name">{tool.name}</span>
-                          <span class="tool-checkbox-desc">{tool.description || ''}</span>
-                        </label>
-                      {/each}
-                    </div>
-                  {:else}
-                    <p class="tool-hint" style="padding:8px 0;">No tools discovered from this server.</p>
-                  {/if}
-
-                  {#if orphaned.length > 0}
-                    <div class="tool-orphaned-section">
-                      <span class="tool-orphaned-label">Previously enabled (no longer on server):</span>
-                      {#each orphaned as tool}
-                        <label class="tool-checkbox-label tool-orphaned">
-                          <input
-                            type="checkbox"
-                            checked={true}
-                            onchange={() => toggleTool(srvName, tool)}
-                          />
-                          <span class="tool-checkbox-name">{tool}</span>
-                        </label>
-                      {/each}
-                    </div>
-                  {/if}
-                </div>
-              {/if}
-            </div>
-          {/each}
-        </div>
+                {/if}
+              </div>
+            {/each}
+          </div>
+        {/if}
       {/if}
     </div>
 
@@ -430,6 +506,18 @@
     padding: 2px 8px;
     border-radius: 10px;
   }
+  .tool-section-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+  }
+  .tool-divider {
+    border-top: 1px solid var(--border);
+    margin: 16px 0 12px 0;
+  }
   .tool-add-row {
     display: flex;
     gap: 8px;
@@ -440,10 +528,64 @@
     flex: 1;
   }
   .tool-hint {
-    font-size: 0.8rem;
+    font-size: 0.78rem;
     color: var(--text-muted);
     margin: 4px 0;
+    line-height: 1.4;
   }
+
+  /* Sub-agent chips */
+  .sub-agent-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 4px;
+  }
+  .sub-agent-chip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  .sub-agent-icon {
+    font-size: 0.9rem;
+    flex-shrink: 0;
+  }
+  .sub-agent-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    flex: 1;
+  }
+  .sub-agent-name {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--text-base);
+  }
+  .sub-agent-desc {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .sub-agent-remove {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    cursor: pointer;
+    padding: 0 4px;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+  .sub-agent-remove:hover { color: #ef4444; }
+
+  /* Server cards */
   .tool-servers-list {
     display: flex;
     flex-direction: column;
