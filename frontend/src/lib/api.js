@@ -7,14 +7,16 @@ async function request(method, path, body) {
 
   const res = await fetch(path, opts)
   if (!res.ok) {
-    let msg
+    let msg = res.statusText
     try {
-      const err = await res.json()
-      msg = err.error || JSON.stringify(err)
-    } catch {
-      msg = await res.text()
-    }
-    throw new Error(msg || res.statusText)
+      const text = await res.text()
+      msg = text || msg
+      try {
+        const err = JSON.parse(text)
+        msg = err.error || text
+      } catch {}
+    } catch {} // body already consumed or empty
+    throw new Error(msg)
   }
   if (res.status === 204 || res.headers.get('content-length') === '0') return null
   return res.json()
