@@ -26,7 +26,10 @@
   }
 
   async function createKey() {
-    if (!newKeyName.trim()) return
+    if (!newKeyName.trim()) {
+      alert('Please enter a key name')
+      return
+    }
     creating = true
     try {
       const key = await api.post('/api-keys', { name: newKeyName.trim() })
