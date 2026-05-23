@@ -225,6 +225,16 @@ func (m *Manager) GetSession(sessionID string) (*sessionData, bool) {
 	return sd, true
 }
 
+func (m *Manager) GetSessionForMe(sessionID string) (*UserInfo, bool) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	sd, ok := m.sessions[sessionID]
+	if !ok {
+		return nil, false
+	}
+	return &sd.UserInfo, true
+}
+
 func (m *Manager) DeleteSession(sessionID string) {
 	m.mu.Lock()
 	delete(m.sessions, sessionID)

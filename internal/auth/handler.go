@@ -119,11 +119,19 @@ func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) me(w http.ResponseWriter, r *http.Request) {
-	ui := UserInfoFromRequest(r)
-	if ui == nil {
+	cookie, err := r.Cookie("session")
+	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
 		json.NewEncoder(w).Encode(map[string]string{"error": "not authenticated"})
+		return
+	}
+
+	ui, ok := h.mgr.GetSessionForMe(cookie.Value)
+	if !ok {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]string{"error": "session expired"})
 		return
 	}
 

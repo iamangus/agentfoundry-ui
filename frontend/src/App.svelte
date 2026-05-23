@@ -21,17 +21,19 @@
   <Navbar {page} />
 
   <main class="page-body">
-    {#if page === '/chat' || page === '/'}
-      <Chat />
-    {:else if page === '/agents'}
-      <Agents />
-    {:else if page === '/tools'}
-      <Tools />
-    {:else if page === '/api-keys'}
-      <ApiKeys />
-    {:else}
-      <Chat />
-    {/if}
+    {#key page}
+      {#if page === '/chat' || page === '/'}
+        <Chat />
+      {:else if page === '/agents'}
+        <Agents />
+      {:else if page === '/tools'}
+        <Tools />
+      {:else if page === '/api-keys'}
+        <ApiKeys />
+      {:else}
+        <Chat />
+      {/if}
+    {/key}
   </main>
 </div>
 
