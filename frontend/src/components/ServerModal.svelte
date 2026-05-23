@@ -138,7 +138,7 @@
 
     <div class="modal-actions">
       <button onclick={close} class="modal-btn modal-btn-cancel">Cancel</button>
-      <button onclick={isEdit ? update() : save()} class="modal-btn modal-btn-create" disabled={saving}>
+      <button onclick={() => isEdit ? update() : save()} class="modal-btn modal-btn-create" disabled={saving}>
         {saving ? 'Saving...' : isEdit ? 'Update' : 'Register'}
       </button>
     </div>
