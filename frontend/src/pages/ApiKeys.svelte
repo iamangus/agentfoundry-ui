@@ -21,9 +21,12 @@
     }
   }
 
+  function onNameInput(e) {
+    newKeyName = e.target.value
+  }
+
   async function createKey() {
     if (!newKeyName.trim()) return
-    console.log('createKey called with', newKeyName)
     creating = true
     try {
       const key = await api.post('/api-keys', { name: newKeyName.trim() })
@@ -65,12 +68,12 @@
     <div class="create-form">
       <input
         value={newKeyName}
-        oninput={(e) => newKeyName = e.target.value}
+        oninput={onNameInput}
         class="sb-input"
         placeholder="Key name..."
         onkeydown={(e) => { if (e.key === 'Enter') createKey() }}
       />
-      <button onclick={createKey} class="sb-submit" style="width:auto;" disabled={!newKeyName.trim() || creating}>
+      <button onclick={createKey} class="sb-submit" style="width:auto;" disabled={creating}>
         {creating ? 'Creating...' : 'Create Key'}
       </button>
     </div>
