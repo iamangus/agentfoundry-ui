@@ -60,44 +60,44 @@
   <div class="form-body">
     <div class="form-group">
       <label class="form-label">Name</label>
-      <input bind:value={name} class="sb-input" placeholder="Agent name" />
+      <input value={name} oninput={(e) => name = e.target.value} class="sb-input" placeholder="Agent name" />
     </div>
 
     <div class="form-group">
       <label class="form-label">Description</label>
-      <input bind:value={description} class="sb-input" placeholder="Brief description" />
+      <input value={description} oninput={(e) => description = e.target.value} class="sb-input" placeholder="Brief description" />
     </div>
 
     <div class="form-group">
       <label class="form-label">Model</label>
-      <input bind:value={model} class="sb-input" placeholder="e.g. gpt-4o" />
+      <input value={model} oninput={(e) => model = e.target.value} class="sb-input" placeholder="e.g. gpt-4o" />
     </div>
 
     <div class="form-group">
       <label class="form-label">System Prompt</label>
-      <textarea bind:value={systemPrompt} class="sb-input form-textarea" placeholder="System prompt..." rows="6"></textarea>
+      <textarea value={systemPrompt} oninput={(e) => systemPrompt = e.target.value} class="sb-input form-textarea" placeholder="System prompt..." rows="6"></textarea>
     </div>
 
     <div class="form-group">
       <label class="form-label">Tools (one per line)</label>
-      <textarea bind:value={toolsText} class="sb-input form-textarea" placeholder="tool-name&#10;another-tool" rows="4"></textarea>
+      <textarea value={toolsText} oninput={(e) => toolsText = e.target.value} class="sb-input form-textarea" placeholder="tool-name&#10;another-tool" rows="4"></textarea>
     </div>
 
     <div class="form-row">
       <div class="form-group">
         <label class="form-label">Max Turns</label>
-        <input bind:value={maxTurns} type="number" class="sb-input" placeholder="0 = unlimited" />
+        <input value={maxTurns} oninput={(e) => maxTurns = e.target.value} type="number" class="sb-input" placeholder="0 = unlimited" />
       </div>
       <div class="form-group">
         <label class="form-label">Max Concurrent Tools</label>
-        <input bind:value={maxConcurrentTools} type="number" class="sb-input" placeholder="0 = unlimited" />
+        <input value={maxConcurrentTools} oninput={(e) => maxConcurrentTools = e.target.value} type="number" class="sb-input" placeholder="0 = unlimited" />
       </div>
     </div>
 
     <div class="form-row">
       <div class="form-group">
         <label class="form-label">Scope</label>
-        <select bind:value={scope} class="sb-input">
+        <select value={scope} onchange={(e) => scope = e.target.value} class="sb-input">
           <option value="">personal</option>
           <option value="team">team</option>
           <option value="global">global</option>
@@ -105,24 +105,24 @@
       </div>
       <div class="form-group">
         <label class="form-label">Team</label>
-        <input bind:value={team} class="sb-input" placeholder="Team name" />
+        <input value={team} oninput={(e) => team = e.target.value} class="sb-input" placeholder="Team name" />
       </div>
     </div>
 
     <div class="form-group">
       <label class="form-check">
-        <input bind:checked={forceJson} type="checkbox" />
+        <input checked={forceJson} onchange={(e) => forceJson = e.target.checked} type="checkbox" />
         Force JSON output
       </label>
     </div>
 
     <div class="form-group">
       <label class="form-check">
-        <input bind:checked={soEnabled} type="checkbox" />
+        <input checked={soEnabled} onchange={(e) => soEnabled = e.target.checked} type="checkbox" />
         Structured Output
       </label>
       {#if soEnabled}
-        <textarea bind:value={soJSON} class="sb-input form-textarea mono" placeholder='{"name": "...", "schema": {...}, "strict": false}' rows="8" style="margin-top:8px;"></textarea>
+        <textarea value={soJSON} oninput={(e) => soJSON = e.target.value} class="sb-input form-textarea mono" placeholder='{"name": "...", "schema": {...}, "strict": false}' rows="8" style="margin-top:8px;"></textarea>
       {/if}
     </div>
   </div>

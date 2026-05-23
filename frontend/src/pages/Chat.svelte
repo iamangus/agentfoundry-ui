@@ -167,7 +167,7 @@
     <div class="sidebar-section">
       <div class="sb-section-label">New Chat</div>
       <div style="display:flex; gap:6px; margin-top:6px;">
-        <select bind:value={selectedAgent} class="sb-input" style="flex:1;">
+        <select value={selectedAgent} onchange={(e) => selectedAgent = e.target.value} class="sb-input" style="flex:1;">
           {#if agents.length === 0}
             <option disabled>No agents</option>
           {:else}
@@ -262,11 +262,11 @@
       <div class="chat-foot">
         <div class="input-wrap">
           <textarea
-            bind:value={newMessage}
+            value={newMessage}
             onkeydown={handleKeydown}
             rows="1"
             placeholder="Message {currentSession.agent_name}..."
-            oninput={(e) => { e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 140) + 'px'; }}
+            oninput={(e) => { newMessage = e.target.value; e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 140) + 'px'; }}
           ></textarea>
           <button onclick={sendMessage} class="send-btn" aria-label="Send" disabled={!newMessage.trim()}>
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">

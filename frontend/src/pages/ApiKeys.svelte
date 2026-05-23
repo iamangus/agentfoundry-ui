@@ -64,7 +64,8 @@
   <div class="create-section">
     <div class="create-form">
       <input
-        bind:value={newKeyName}
+        value={newKeyName}
+        oninput={(e) => newKeyName = e.target.value}
         class="sb-input"
         placeholder="Key name..."
         onkeydown={(e) => { if (e.key === 'Enter') createKey() }}
