@@ -80,6 +80,10 @@ html, body {
 }
 .sb-submit:hover { opacity: 0.88; }
 .sb-submit:active { transform: scale(0.97); }
+.sb-submit:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
 .sb-submit svg { width: 14px; height: 14px; }
 
 .msg-row { display: flex; }

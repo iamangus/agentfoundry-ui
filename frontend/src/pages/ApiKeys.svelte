@@ -23,9 +23,11 @@
 
   async function createKey() {
     if (!newKeyName.trim()) return
+    console.log('createKey called with', newKeyName)
     creating = true
     try {
       const key = await api.post('/api-keys', { name: newKeyName.trim() })
+      console.log('createKey response', key)
       newKey = key
       newKeyName = ''
       await loadKeys()
