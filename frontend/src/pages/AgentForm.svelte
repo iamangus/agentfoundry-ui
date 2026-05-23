@@ -1,11 +1,12 @@
 <script>
+  import { api } from '../lib/api.js'
+
   let { def, isNew, onsave, oncancel } = $props()
 
   let name = $state(def.name || '')
   let description = $state(def.description || '')
   let model = $state(def.model || '')
   let systemPrompt = $state(def.system_prompt || '')
-  let toolsText = $state((def.tools || []).join('\n'))
   let maxTurns = $state(def.max_turns || 0)
   let maxConcurrentTools = $state(def.max_concurrent_tools || 0)
   let forceJson = $state(def.force_json || false)
@@ -14,11 +15,123 @@
   let soEnabled = $state(!!(def.structured_output))
   let soJSON = $state(def.structured_output ? JSON.stringify(def.structured_output, null, 2) : '')
 
+  let availableServers = $state([])
+  let serversLoading = $state(true)
+  let enabledTools = $state({})
+  let selectedServers = $state([])
+  let expandedServer = $state(null)
+
+  $effect(() => {
+    loadServers()
+  })
+
+  async function loadServers() {
+    try {
+      serversLoading = true
+      availableServers = await api.get('/tools/servers/list')
+      initFromDef()
+    } catch (e) {
+      console.error('Failed to load MCP servers', e)
+    } finally {
+      serversLoading = false
+    }
+  }
+
+  function initFromDef() {
+    if (!def.tools || def.tools.length === 0) return
+    const et = {}
+    for (const qn of def.tools) {
+      const dot = qn.indexOf('.')
+      if (dot === -1) continue
+      const srv = qn.slice(0, dot)
+      const tool = qn.slice(dot + 1)
+      if (!et[srv]) et[srv] = new Set()
+      et[srv].add(tool)
+    }
+    enabledTools = et
+    selectedServers = Object.keys(et)
+  }
+
+  function addServer(name) {
+    if (selectedServers.includes(name)) return
+    selectedServers = [...selectedServers, name]
+    if (!enabledTools[name]) {
+      enabledTools = { ...enabledTools, [name]: new Set() }
+    }
+    expandedServer = name
+  }
+
+  function removeServer(name) {
+    selectedServers = selectedServers.filter(s => s !== name)
+    const et = { ...enabledTools }
+    delete et[name]
+    enabledTools = et
+    if (expandedServer === name) expandedServer = null
+  }
+
+  function toggleTool(serverName, toolName) {
+    const et = { ...enabledTools }
+    if (!et[serverName]) et[serverName] = new Set()
+    const set = new Set(et[serverName])
+    if (set.has(toolName)) {
+      set.delete(toolName)
+    } else {
+      set.add(toolName)
+    }
+    et[serverName] = set
+    enabledTools = et
+  }
+
+  function getServer(name) {
+    return availableServers.find(s => s.name === name)
+  }
+
+  function getServerTools(name) {
+    const srv = getServer(name)
+    return srv ? srv.tools : []
+  }
+
+  function getOrphanedTools(name) {
+    const et = enabledTools[name]
+    if (!et || et.size === 0) return []
+    const found = new Set(getServerTools(name).map(t => t.name))
+    return [...et].filter(t => !found.has(t))
+  }
+
+  function enabledCount(name) {
+    return enabledTools[name]?.size || 0
+  }
+
+  function totalEnabledCount() {
+    let count = 0
+    for (const s of selectedServers) {
+      count += enabledTools[s]?.size || 0
+    }
+    return count
+  }
+
+  function availableServerOptions() {
+    return availableServers.filter(s => !selectedServers.includes(s.name))
+  }
+
+  function scopeLabel(srv) {
+    if (!srv) return 'personal'
+    return srv.scope || 'personal'
+  }
+
+  function isChecked(serverName, toolName) {
+    return enabledTools[serverName]?.has(toolName) || false
+  }
+
   function handleSave() {
-    let tools = toolsText
-      .split('\n')
-      .map(t => t.trim())
-      .filter(t => t)
+    const tools = []
+    for (const s of selectedServers) {
+      const et = enabledTools[s]
+      if (!et) continue
+      for (const t of et) {
+        tools.push(s + '.' + t)
+      }
+    }
 
     let so = null
     if (soEnabled && soJSON.trim()) {
@@ -79,8 +192,109 @@
     </div>
 
     <div class="form-group">
-      <label class="form-label">Tools (one per line)</label>
-      <textarea value={toolsText} oninput={(e) => toolsText = e.target.value} class="sb-input form-textarea" placeholder="tool-name&#10;another-tool" rows="4"></textarea>
+      <div class="tool-section-header">
+        <label class="form-label" style="margin-bottom:0;">Tools</label>
+        {#if totalEnabledCount() > 0}
+          <span class="tool-count-badge">{totalEnabledCount()} enabled</span>
+        {/if}
+      </div>
+
+      {#if serversLoading}
+        <p class="tool-hint">Loading servers...</p>
+      {:else if availableServerOptions().length > 0 || selectedServers.length === 0}
+        <div class="tool-add-row">
+          <select class="sb-input tool-server-select" id="server-select">
+            <option value="">-- Select MCP server --</option>
+            {#each availableServerOptions() as srv}
+              <option value={srv.name}>{srv.name} ({srv.tools.length} tools)</option>
+            {/each}
+          </select>
+          <button class="sb-submit" style="width:auto; padding:9px 16px; font-size:0.82rem;" onclick={() => {
+            const sel = document.getElementById('server-select')
+            if (sel && sel.value) { addServer(sel.value); sel.value = '' }
+          }}>Add</button>
+        </div>
+      {:else}
+        <p class="tool-hint">No MCP servers available. Register one in the Tools tab first.</p>
+      {/if}
+
+      {#if selectedServers.length > 0}
+        <div class="tool-servers-list">
+          {#each selectedServers as srvName}
+            {@const srv = getServer(srvName)}
+            {@const tools = getServerTools(srvName)}
+            {@const orphaned = getOrphanedTools(srvName)}
+            {@const expanded = expandedServer === srvName}
+            <div class="tool-server-card" class:expanded>
+              <div class="tool-server-card-header" onclick={() => expandedServer = expanded ? null : srvName} onkeydown={(e) => { if (e.key === 'Enter') expandedServer = expanded ? null : srvName }} role="button" tabindex="0">
+                <div class="tool-server-card-main">
+                  <span class="tool-server-status" class:connected={srv?.connected} class:disconnected={!srv?.connected}>{srv?.connected ? '●' : '○'}</span>
+                  <span class="tool-server-name">{srvName}</span>
+                  <span class="tool-server-scope scope-{scopeLabel(srv)}">{scopeLabel(srv)}</span>
+                </div>
+                <div class="tool-server-card-meta">
+                  <span class="tool-server-count">{enabledCount(srvName)}/{tools.length + orphaned.length}</span>
+                  <span class="tool-server-expand">{expanded ? '▾' : '▸'}</span>
+                </div>
+              </div>
+
+              {#if expanded}
+                <div class="tool-server-card-body">
+                  <div class="tool-server-actions">
+                    <button class="action-btn action-btn-delete" onclick={() => removeServer(srvName)}>Remove</button>
+                    {#if tools.length > 0}
+                      <button class="action-btn" onclick={() => {
+                        const et = { ...enabledTools }
+                        et[srvName] = new Set(tools.map(t => t.name))
+                        enabledTools = et
+                      }}>Select All</button>
+                      <button class="action-btn" onclick={() => {
+                        const et = { ...enabledTools }
+                        et[srvName] = new Set()
+                        enabledTools = et
+                      }}>Deselect All</button>
+                    {/if}
+                  </div>
+
+                  {#if tools.length > 0}
+                    <div class="tool-checkboxes">
+                      {#each tools as tool}
+                        <label class="tool-checkbox-label">
+                          <input
+                            type="checkbox"
+                            checked={isChecked(srvName, tool.name)}
+                            onchange={() => toggleTool(srvName, tool.name)}
+                          />
+                          <span class="tool-checkbox-name">{tool.name}</span>
+                          <span class="tool-checkbox-desc">{tool.description || ''}</span>
+                        </label>
+                      {/each}
+                    </div>
+                  {:else}
+                    <p class="tool-hint" style="padding:8px 0;">No tools discovered from this server.</p>
+                  {/if}
+
+                  {#if orphaned.length > 0}
+                    <div class="tool-orphaned-section">
+                      <span class="tool-orphaned-label">Previously enabled (no longer on server):</span>
+                      {#each orphaned as tool}
+                        <label class="tool-checkbox-label tool-orphaned">
+                          <input
+                            type="checkbox"
+                            checked={true}
+                            onchange={() => toggleTool(srvName, tool)}
+                          />
+                          <span class="tool-checkbox-name">{tool}</span>
+                        </label>
+                      {/each}
+                    </div>
+                  {/if}
+                </div>
+              {/if}
+            </div>
+          {/each}
+        </div>
+      {/if}
     </div>
 
     <div class="form-row">
@@ -200,4 +414,178 @@
   .form-check input[type="checkbox"] {
     accent-color: var(--purple-solid);
   }
+
+  /* Tool picker */
+  .tool-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+  }
+  .tool-count-badge {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--purple-solid);
+    background: var(--purple-soft);
+    padding: 2px 8px;
+    border-radius: 10px;
+  }
+  .tool-add-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+  .tool-server-select {
+    flex: 1;
+  }
+  .tool-hint {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin: 4px 0;
+  }
+  .tool-servers-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .tool-server-card {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--bg-card);
+  }
+  .tool-server-card.expanded {
+    border-color: var(--purple-soft);
+  }
+  .tool-server-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.1s;
+  }
+  .tool-server-card-header:hover {
+    background: var(--bg-sidebar);
+  }
+  .tool-server-card-main {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .tool-server-status {
+    font-size: 0.6rem;
+  }
+  .tool-server-status.connected { color: #22c55e; }
+  .tool-server-status.disconnected { color: var(--text-muted); }
+  .tool-server-name {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-base);
+  }
+  .tool-server-scope {
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    padding: 1px 6px;
+    border-radius: 4px;
+  }
+  .tool-server-scope.scope-personal { background: var(--bg-sidebar); color: var(--text-muted); }
+  .tool-server-scope.scope-team { background: #1e3a5f; color: #60a5fa; }
+  .tool-server-scope.scope-global { background: #3b1f5e; color: #c084fc; }
+  .tool-server-scope.scope-user { background: var(--bg-sidebar); color: var(--text-muted); }
+  .tool-server-card-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+  }
+  .tool-server-count {
+    font-variant-numeric: tabular-nums;
+  }
+  .tool-server-expand {
+    font-size: 0.7rem;
+  }
+  .tool-server-card-body {
+    border-top: 1px solid var(--border);
+    padding: 12px;
+  }
+  .tool-server-actions {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+  .tool-checkboxes {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-height: 240px;
+    overflow-y: auto;
+  }
+  .tool-checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 4px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+  .tool-checkbox-label:hover {
+    background: var(--bg-sidebar);
+  }
+  .tool-checkbox-label input[type="checkbox"] {
+    accent-color: var(--purple-solid);
+    flex-shrink: 0;
+  }
+  .tool-checkbox-name {
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--text-base);
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    white-space: nowrap;
+  }
+  .tool-checkbox-desc {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .tool-orphaned-section {
+    margin-top: 10px;
+    border-top: 1px dashed var(--border);
+    padding-top: 8px;
+  }
+  .tool-orphaned-label {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    display: block;
+    margin-bottom: 4px;
+  }
+  .tool-orphaned {
+    opacity: 0.65;
+  }
+  .tool-orphaned .tool-checkbox-name {
+    text-decoration: line-through;
+    color: var(--text-muted);
+  }
+
+  .action-btn {
+    padding: 4px 10px;
+    background: var(--bg-sidebar);
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    font-family: inherit;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: background 0.1s, color 0.1s;
+  }
+  .action-btn:hover { background: var(--border); color: var(--text-base); }
+  .action-btn-delete { color: #ef4444; border-color: #ef444440; }
+  .action-btn-delete:hover { background: #ef444418; color: #ef4444; }
 </style>
