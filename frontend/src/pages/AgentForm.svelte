@@ -376,11 +376,11 @@
     <div class="form-row">
       <div class="form-group">
         <label class="form-label">Max Turns</label>
-        <input value={maxTurns} oninput={(e) => maxTurns = e.target.value} type="number" class="sb-input" placeholder="0 = unlimited" />
+        <input value={maxTurns} oninput={(e) => maxTurns = e.target.valueAsNumber || 0} type="number" class="sb-input" placeholder="0 = unlimited" />
       </div>
       <div class="form-group">
         <label class="form-label">Max Concurrent Tools</label>
-        <input value={maxConcurrentTools} oninput={(e) => maxConcurrentTools = e.target.value} type="number" class="sb-input" placeholder="0 = unlimited" />
+        <input value={maxConcurrentTools} oninput={(e) => maxConcurrentTools = e.target.valueAsNumber || 0} type="number" class="sb-input" placeholder="0 = unlimited" />
       </div>
     </div>
 
