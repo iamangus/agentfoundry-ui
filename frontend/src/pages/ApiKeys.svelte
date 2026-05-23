@@ -14,7 +14,7 @@
 
   async function loadKeys() {
     try {
-      keys = await api.get('/api-keys')
+      keys = await api.get('/api/keys')
     } catch (e) {
       console.error('Failed to load API keys', e)
     } finally {
@@ -35,7 +35,7 @@
     if (!name) return
     creating = true
     try {
-      const key = await api.post('/api-keys', { name })
+      const key = await api.post('/api/keys', { name })
       newKey = key
       showCreateModal = false
       if (modalNameInput) modalNameInput.value = ''
@@ -51,7 +51,7 @@
   async function revokeKey(id) {
     if (!confirm('Revoke this API key?')) return
     try {
-      await api.del('/api-keys/' + id)
+      await api.del('/api/keys/' + id)
     } catch (e) {
       console.error('Failed to revoke key', e)
     }

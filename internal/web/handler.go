@@ -47,9 +47,9 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /tools/list", h.jsonToolList)
 	mux.HandleFunc("POST /tools/generate", h.jsonToolGenerate)
 
-	mux.HandleFunc("GET /api-keys", h.jsonAPIKeysList)
-	mux.HandleFunc("POST /api-keys", h.jsonCreateAPIKey)
-	mux.HandleFunc("DELETE /api-keys/{id}", h.jsonRevokeAPIKey)
+	mux.HandleFunc("GET /api/keys", h.jsonAPIKeysList)
+	mux.HandleFunc("POST /api/keys", h.jsonCreateAPIKey)
+	mux.HandleFunc("DELETE /api/keys/{id}", h.jsonRevokeAPIKey)
 
 	slog.Info("web UI routes registered")
 }
