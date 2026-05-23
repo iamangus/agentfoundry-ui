@@ -77,6 +77,7 @@
     const content = newMessage
     newMessage = ''
     messages = [...messages, { role: 'user', content }]
+    requestAnimationFrame(() => scrollDown())
 
     try {
       const result = await api.post('/chat/sessions/' + currentSession.id + '/messages', { message: content })
@@ -146,10 +147,13 @@
     }
     streamBubbles = []
     activeRunId = ''
+    requestAnimationFrame(() => scrollDown())
   }
 
   function scrollDown() {
-    if (messageListEl) {
+    if (!messageListEl) return
+    const nearBottom = messageListEl.scrollHeight - messageListEl.scrollTop - messageListEl.clientHeight < 50
+    if (nearBottom) {
       messageListEl.scrollTop = messageListEl.scrollHeight
     }
   }
