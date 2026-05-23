@@ -2,10 +2,11 @@
   import { api } from '../lib/api.js'
 
   let keys = $state([])
-  let newKeyName = $state('')
   let newKey = $state(null)
   let loading = $state(true)
   let creating = $state(false)
+  let showCreateModal = $state(false)
+  let modalNameInput = $state(null)
 
   $effect(() => {
     loadKeys()
@@ -21,21 +22,23 @@
     }
   }
 
-  function onNameInput(e) {
-    newKeyName = e.target.value
+  function openCreateModal() {
+    showCreateModal = true
+  }
+
+  function closeCreateModal() {
+    showCreateModal = false
   }
 
   async function createKey() {
-    if (!newKeyName.trim()) {
-      alert('Please enter a key name')
-      return
-    }
+    const name = modalNameInput?.value?.trim()
+    if (!name) return
     creating = true
     try {
-      const key = await api.post('/api-keys', { name: newKeyName.trim() })
-      console.log('createKey response', key)
+      const key = await api.post('/api-keys', { name })
       newKey = key
-      newKeyName = ''
+      showCreateModal = false
+      if (modalNameInput) modalNameInput.value = ''
       await loadKeys()
     } catch (e) {
       console.error('Failed to create key', e)
@@ -65,23 +68,11 @@
 <div class="keys-page">
   <div class="page-header">
     <h2 class="page-title">API Keys</h2>
+    <button onclick={openCreateModal} class="sb-submit" style="width:auto; padding: 7px 16px;">Create Key</button>
   </div>
 
-  <div class="create-section">
-    <div class="create-form">
-      <input
-        value={newKeyName}
-        oninput={onNameInput}
-        class="sb-input"
-        placeholder="Key name..."
-        onkeydown={(e) => { if (e.key === 'Enter') createKey() }}
-      />
-      <button onclick={createKey} class="sb-submit" style="width:auto;" disabled={creating}>
-        {creating ? 'Creating...' : 'Create Key'}
-      </button>
-    </div>
-
-    {#if newKey && newKey.full_key}
+  {#if newKey && newKey.full_key}
+    <div class="create-section">
       <div class="key-result">
         <div class="key-result-header">
           <span class="key-result-label">Key created — copy it now, it won't be shown again</span>
@@ -94,8 +85,8 @@
         </div>
         <code class="full-key">{newKey.full_key}</code>
       </div>
-    {/if}
-  </div>
+    </div>
+  {/if}
 
   {#if loading}
     <p style="color:var(--text-muted); padding:20px;">Loading...</p>
@@ -137,6 +128,34 @@
   {/if}
 </div>
 
+{#if showCreateModal}
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div
+    class="modal-backdrop"
+    onclick={closeCreateModal}
+    onkeydown={(e) => { if (e.key === 'Escape') closeCreateModal() }}
+  >
+    <!-- svelte-ignore a11y_click_events_have_key_events a11y_interactive_supports_focus -->
+    <div class="modal-card" onclick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" tabindex="-1">
+      <h3 class="modal-title">Create API Key</h3>
+      <label class="modal-label" for="modal-key-name">Key name</label>
+      <input
+        id="modal-key-name"
+        bind:this={modalNameInput}
+        class="sb-input"
+        placeholder="e.g. Production, Staging"
+        onkeydown={(e) => { if (e.key === 'Enter') createKey(); if (e.key === 'Escape') closeCreateModal() }}
+      />
+      <div class="modal-actions">
+        <button onclick={closeCreateModal} class="modal-btn modal-btn-cancel">Cancel</button>
+        <button onclick={createKey} class="modal-btn modal-btn-create" disabled={creating}>
+          {creating ? 'Creating...' : 'Create'}
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
+
 <style>
   .keys-page {
     flex: 1;
@@ -157,11 +176,62 @@
   .create-section {
     margin-bottom: 24px;
   }
-  .create-form {
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
     display: flex;
-    gap: 10px;
-    max-width: 500px;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
   }
+  .modal-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    width: 380px;
+    max-width: 90vw;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+  }
+  .modal-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    margin: 0 0 16px 0;
+  }
+  .modal-label {
+    display: block;
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+  }
+  .modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 16px;
+  }
+  .modal-btn {
+    padding: 7px 16px;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 0.82rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.12s, opacity 0.12s;
+    border: 1px solid var(--border);
+    background: var(--bg-card);
+    color: var(--text-base);
+  }
+  .modal-btn-cancel:hover { background: var(--bg-sidebar); }
+  .modal-btn-create {
+    background: var(--purple-solid);
+    border-color: transparent;
+    color: #fff;
+  }
+  .modal-btn-create:hover { opacity: 0.85; }
+  .modal-btn-create:disabled { opacity: 0.45; cursor: not-allowed; }
   .key-result {
     margin-top: 16px;
     padding: 16px;
