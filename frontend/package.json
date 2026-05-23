@@ -1,0 +1,16 @@
+{
+  "name": "agentfoundry-ui",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^5.0.3",
+    "svelte": "^5.20.0",
+    "vite": "^6.1.0"
+  },
+  "dependencies": {
+    "marked": "^15.0.0"
+  }
+}

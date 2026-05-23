@@ -3,13 +3,16 @@ package main
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
+	"github.com/angoo/agentfoundry-ui/frontend"
 	"github.com/angoo/agentfoundry-ui/internal/auth"
 	"github.com/angoo/agentfoundry-ui/internal/config"
 	"github.com/angoo/agentfoundry-ui/internal/web"
@@ -30,7 +33,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	handler, err := web.NewHandler(cfg.BackendURL, authMgr)
+	handler, err := web.NewHandler(cfg.BackendURL)
 	if err != nil {
 		slog.Error("failed to create web handler", "error", err)
 		os.Exit(1)
@@ -40,12 +43,38 @@ func main() {
 		handler.Client().SetTokenProvider(&contextTokenProvider{})
 	}
 
+	distFS, err := fs.Sub(frontend.Dist, "dist")
+	if err != nil {
+		slog.Error("failed to load embedded frontend", "error", err)
+		os.Exit(1)
+	}
+	fileServer := http.FileServer(http.FS(distFS))
+
 	mux := http.NewServeMux()
 
 	authHandler := auth.NewHandler(authMgr, cfg)
 	authHandler.RegisterRoutes(mux)
 
 	handler.RegisterRoutes(mux)
+
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/auth/") || strings.HasPrefix(r.URL.Path, "/api/") {
+			return
+		}
+
+		assetPath := strings.TrimPrefix(strings.TrimPrefix(r.URL.Path, "/"), "./")
+		if assetPath == "" {
+			assetPath = "index.html"
+		}
+
+		info, err := fs.Stat(distFS, assetPath)
+		if err != nil || info.IsDir() {
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			http.ServeFileFS(w, r, distFS, "index.html")
+			return
+		}
+		fileServer.ServeHTTP(w, r)
+	})
 
 	var rootHandler http.Handler = mux
 	if authMgr.Enabled() {

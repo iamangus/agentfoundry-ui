@@ -1,0 +1,13 @@
+root = "."
+tmp_dir = "tmp"
+
+[build]
+cmd = "go build -o ./tmp/main ./cmd/server"
+bin = "./tmp/main"
+delay = 1000
+include_ext = ["go", "html", "js", "css"]
+exclude_dir = ["tmp", "frontend/node_modules"]
+kill_delay = "0s"
+
+[log]
+time = false
