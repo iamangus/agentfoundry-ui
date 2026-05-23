@@ -10,7 +10,7 @@
   let maxTurns = $state(def.max_turns || 0)
   let maxConcurrentTools = $state(def.max_concurrent_tools || 0)
   let forceJson = $state(def.force_json || false)
-  let scope = $state(def.scope || '')
+  let scope = $state(def.scope || 'user')
   let team = $state(def.team || '')
   let soEnabled = $state(!!(def.structured_output))
   let soJSON = $state(def.structured_output ? JSON.stringify(def.structured_output, null, 2) : '')
@@ -388,7 +388,7 @@
       <div class="form-group">
         <label class="form-label">Scope</label>
         <select value={scope} onchange={(e) => scope = e.target.value} class="sb-input">
-          <option value="">personal</option>
+          <option value="user">personal</option>
           <option value="team">team</option>
           <option value="global">global</option>
         </select>
