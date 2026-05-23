@@ -1,5 +1,5 @@
 <script>
-  import { user, userLoading } from '../lib/stores.js'
+  import { user, userLoading, theme } from '../lib/stores.js'
   import { navigate } from '../lib/stores.js'
 
   let { page } = $props()
@@ -40,8 +40,17 @@
     {/each}
   </div>
 
+  <div class="nav-spacer"></div>
+
+  <button class="theme-toggle" onclick={() => theme.toggle()} title="Toggle theme">
+    {#if $theme === 'dark'}
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.25a.75.75 0 0 1 .75.75v2.25a.75.75 0 0 1-1.5 0V3a.75.75 0 0 1 .75-.75ZM7.5 12a4.5 4.5 0 1 1 9 0 4.5 4.5 0 0 1-9 0ZM18.894 6.166a.75.75 0 0 0-1.06-1.06l-1.591 1.59a.75.75 0 1 0 1.06 1.061l1.591-1.59ZM21.75 12a.75.75 0 0 1-.75.75h-2.25a.75.75 0 0 1 0-1.5H21a.75.75 0 0 1 .75.75ZM17.834 18.894a.75.75 0 0 0 1.06-1.06l-1.59-1.591a.75.75 0 1 0-1.061 1.06l1.59 1.591ZM12 18a.75.75 0 0 1 .75.75V21a.75.75 0 0 1-1.5 0v-2.25A.75.75 0 0 1 12 18ZM7.758 17.303a.75.75 0 0 0-1.061-1.06l-1.591 1.59a.75.75 0 0 0 1.06 1.061l1.591-1.59ZM6 12a.75.75 0 0 1-.75.75H3a.75.75 0 0 1 0-1.5h2.25A.75.75 0 0 1 6 12ZM6.697 7.757a.75.75 0 0 0 1.06-1.06l-1.59-1.591a.75.75 0 0 0-1.061 1.06l1.59 1.591Z"/></svg>
+    {:else}
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" d="M9.528 1.718a.75.75 0 0 1 .162.819A8.97 8.97 0 0 0 9 6a9 9 0 0 0 9 9 8.97 8.97 0 0 0 3.463-.69.75.75 0 0 1 .981.98 10.503 10.503 0 0 1-9.694 6.46c-5.799 0-10.5-4.701-10.5-10.5 0-4.368 2.667-8.112 6.46-9.694a.75.75 0 0 1 .818.162Z" clip-rule="evenodd"/></svg>
+    {/if}
+  </button>
+
   {#if currentUser}
-    <div class="nav-spacer"></div>
     <div class="nav-user">
       <span class="nav-user-name">{currentUser.username}</span>
       {#if currentUser.is_admin}<span class="nav-admin-badge">admin</span>{/if}
@@ -134,4 +143,14 @@
     border-radius: 6px; transition: background 0.12s, color 0.12s;
   }
   .nav-logout:hover { background: var(--bg-card); color: var(--text-base); }
+  .theme-toggle {
+    display: flex; align-items: center; justify-content: center;
+    width: 32px; height: 32px; border-radius: 7px;
+    border: 1px solid var(--border); background: var(--bg-card);
+    color: var(--text-muted); cursor: pointer;
+    transition: background 0.12s, color 0.12s;
+    padding: 0; flex-shrink: 0;
+  }
+  .theme-toggle:hover { background: var(--bg-sidebar); color: var(--text-base); }
+  .theme-toggle svg { width: 16px; height: 16px; }
 </style>

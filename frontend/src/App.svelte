@@ -17,7 +17,7 @@
 
 <svelte:window onpopstate={handlePopstate} />
 
-<div class="dark">
+<div>
   <Navbar {page} />
 
   <main class="page-body">

@@ -1,10 +1,19 @@
 :root {
-  --uk-primary: oklch(59.1% 0.249 292.7);
-  --uk-primary-f: oklch(100% 0 0);
-  --uk-focus: oklch(66.6% 0.247 292.0);
+  --bg-base:    #fafafa;
+  --bg-sidebar: #f3f3f5;
+  --bg-card:    #ffffff;
+  --border:     #e4e4e7;
+  --text-base:  #1a1a1e;
+  --text-muted: #6b6b78;
+  --purple:     oklch(55% 0.25 292.7);
+  --purple-dim: oklch(55% 0.25 292.7 / 0.12);
+  --purple-solid: #7c3aed;
+  --red-dim:    oklch(50% 0.2 25 / 0.12);
+  --red-text:   oklch(45% 0.2 25);
+  --red-border: oklch(50% 0.2 25 / 0.25);
 }
 
-body.dark {
+html.dark, [data-theme="dark"] {
   --bg-base:    #0f0f11;
   --bg-sidebar: #0a0a0d;
   --bg-card:    #18181c;
