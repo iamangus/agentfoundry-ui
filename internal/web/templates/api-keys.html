@@ -131,7 +131,8 @@
       <label class="field-label">Your API Key</label>
       <div class="full-key-display" id="full-key-value"></div>
       <p class="warning-text">Copy this key now. It cannot be shown again.</p>
-      <button class="btn-primary" style="width:100%; margin-top:16px;" onclick="copyKeyAndClose()">Copy & Close</button>
+      <button id="copy-key-btn" class="btn-primary" style="width:100%; margin-top:16px;" onclick="copyKey()">Copy</button>
+      <button style="width:100%; margin-top:8px; padding:8px; background:transparent; border:1px solid var(--border); border-radius:8px; color:var(--text-muted); font-family:inherit; font-size:0.85rem; cursor:pointer;" onclick="closeKeyModal()">Close</button>
     </div>
     <button style="width:100%; margin-top:12px; padding:8px; background:transparent; border:1px solid var(--border); border-radius:8px; color:var(--text-muted); font-family:inherit; font-size:0.85rem; cursor:pointer;" onclick="document.getElementById('new-key-modal').style.display='none'; document.getElementById('key-create-form').style.display='block'; document.getElementById('key-result').style.display='none';">
       Cancel
@@ -159,14 +160,54 @@ function createKey() {
   .catch(function(err) { alert('Failed to create key: ' + err); });
 }
 
-function copyKeyAndClose() {
+function copyKey() {
   var key = document.getElementById('full-key-value').textContent;
-  navigator.clipboard.writeText(key).then(function() {
-    document.getElementById('new-key-modal').style.display = 'none';
-    document.getElementById('key-create-form').style.display = 'block';
-    document.getElementById('key-result').style.display = 'none';
-    document.getElementById('key-name').value = '';
-  });
+  var btn = document.getElementById('copy-key-btn');
+
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(key).then(function() {
+      btn.textContent = 'Copied!';
+    }).catch(function() {
+      fallbackCopy(key, btn);
+    });
+  } else {
+    fallbackCopy(key, btn);
+  }
+}
+
+function fallbackCopy(text, btn) {
+  var el = document.createElement('textarea');
+  el.value = text;
+  el.style.position = 'fixed';
+  el.style.left = '-9999px';
+  document.body.appendChild(el);
+  el.select();
+  var ok = false;
+  try { ok = document.execCommand('copy'); } catch(e) {}
+  document.body.removeChild(el);
+  if (ok) {
+    btn.textContent = 'Copied!';
+  } else {
+    selectKeyText();
+    btn.textContent = 'Copy failed — use Ctrl+C';
+  }
+}
+
+function selectKeyText() {
+  var range = document.createRange();
+  range.selectNodeContents(document.getElementById('full-key-value'));
+  var sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+
+function closeKeyModal() {
+  document.getElementById('new-key-modal').style.display = 'none';
+  document.getElementById('key-create-form').style.display = 'block';
+  document.getElementById('key-result').style.display = 'none';
+  document.getElementById('key-name').value = '';
+  var btn = document.getElementById('copy-key-btn');
+  btn.textContent = 'Copy';
 }
 
 function revokeKey(id, name) {
