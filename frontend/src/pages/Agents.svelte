@@ -1,5 +1,6 @@
 <script>
   import { api } from '../lib/api.js'
+  import AgentForm from './AgentForm.svelte'
 
   let agents = $state([])
   let groups = $state({ personal: [], team: [], global: [] })

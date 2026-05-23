@@ -122,7 +122,7 @@
         Structured Output
       </label>
       {#if soEnabled}
-        <textarea value={soJSON} oninput={(e) => soJSON = e.target.value} class="sb-input form-textarea mono" placeholder='{"name": "...", "schema": {...}, "strict": false}' rows="8" style="margin-top:8px;"></textarea>
+        <textarea value={soJSON} oninput={(e) => soJSON = e.target.value} class="sb-input form-textarea mono" placeholder='"name": "", "schema": null, "strict": false' rows="8" style="margin-top:8px;"></textarea>
       {/if}
     </div>
   </div>
