@@ -75,10 +75,11 @@ func main() {
 		fileServer.ServeHTTP(w, r)
 	})
 
-	var rootHandler http.Handler = cors.Middleware(cfg.CORSOrigin)(mux)
+	var rootHandler http.Handler = mux
 	if authMgr.Enabled() {
 		rootHandler = authMgr.Middleware(rootHandler)
 	}
+	rootHandler = cors.Middleware(cfg.CORSOrigin)(rootHandler)
 
 	server := &http.Server{
 		Addr:    cfg.Listen,
