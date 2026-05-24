@@ -6,6 +6,8 @@ type Config struct {
 	Listen     string
 	BackendURL string
 
+	CORSOrigin string
+
 	KeycloakURL          string
 	KeycloakRealm        string
 	KeycloakClientID     string
@@ -28,9 +30,16 @@ func Load() *Config {
 		backendURL = "http://localhost:3000"
 	}
 
+	corsOrigin := os.Getenv("CORS_ORIGIN")
+	if corsOrigin == "" {
+		corsOrigin = "*"
+	}
+
 	return &Config{
 		Listen:     listen,
 		BackendURL: backendURL,
+
+		CORSOrigin: corsOrigin,
 
 		KeycloakURL:          os.Getenv("KEYCLOAK_URL"),
 		KeycloakRealm:        os.Getenv("KEYCLOAK_REALM"),

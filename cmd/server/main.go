@@ -15,6 +15,7 @@ import (
 	"github.com/angoo/agentfoundry-ui/frontend"
 	"github.com/angoo/agentfoundry-ui/internal/auth"
 	"github.com/angoo/agentfoundry-ui/internal/config"
+	"github.com/angoo/agentfoundry-ui/internal/cors"
 	"github.com/angoo/agentfoundry-ui/internal/web"
 )
 
@@ -74,9 +75,9 @@ func main() {
 		fileServer.ServeHTTP(w, r)
 	})
 
-	var rootHandler http.Handler = mux
+	var rootHandler http.Handler = cors.Middleware(cfg.CORSOrigin)(mux)
 	if authMgr.Enabled() {
-		rootHandler = authMgr.Middleware(mux)
+		rootHandler = authMgr.Middleware(rootHandler)
 	}
 
 	server := &http.Server{
