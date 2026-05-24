@@ -8,9 +8,13 @@
   let editingServer = $state(null)
   let expandedServer = $state(null)
   let serverLoading = $state(false)
+  let refreshTimer = $state(null)
 
   $effect(() => {
     loadMCPServers()
+    return () => {
+      if (refreshTimer) clearTimeout(refreshTimer)
+    }
   })
 
   async function loadMCPServers() {
@@ -64,7 +68,11 @@
     serverLoading = true
     try {
       await api.post('/tools/servers/' + name + '/refresh', {})
-      setTimeout(() => loadMCPServers(), 1500)
+      if (refreshTimer) clearTimeout(refreshTimer)
+      refreshTimer = setTimeout(() => {
+        refreshTimer = null
+        loadMCPServers()
+      }, 1500)
     } catch (e) {
       console.error('Failed to refresh', e)
     } finally {

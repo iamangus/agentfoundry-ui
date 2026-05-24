@@ -17,9 +17,13 @@
   let streamingContent = $state('')
   let streamingStatus = $state('')
   let activeRunId = $state('')
+  let eventSource = $state(null)
 
   $effect(() => {
     loadData()
+    return () => {
+      eventSource?.close()
+    }
   })
 
   async function loadData() {
@@ -88,12 +92,14 @@
   }
 
   function startStream(runId) {
+    eventSource?.close()
     activeRunId = runId
     streamingContent = ''
     streamingStatus = 'Thinking'
     streamBubbles = []
 
     const es = new EventSource('/chat/runs/' + runId + '/events')
+    eventSource = es
 
     es.addEventListener('response_start', () => {
       streamingStatus = ''
@@ -115,12 +121,14 @@
 
     es.addEventListener('done', (e) => {
       es.close()
+      eventSource = null
       finalizeStream(e.data)
     })
 
     es.addEventListener('error', (e) => {
       if (es.readyState === EventSource.CLOSED) return
       es.close()
+      eventSource = null
       if (e.data) {
         finalizeStream(e.data)
       } else {
@@ -132,6 +140,7 @@
 
     es.onerror = () => {
       es.close()
+      eventSource = null
       activeRunId = ''
     }
   }
