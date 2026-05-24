@@ -1,5 +1,6 @@
 <script>
   import { api } from '../lib/api.js'
+  import { teams, loadTeams } from '../lib/stores.js'
 
   let { def, isNew, onsave, oncancel } = $props()
 
@@ -25,6 +26,7 @@
 
   $effect(() => {
     loadAll()
+    loadTeams()
   })
 
   async function loadAll() {
@@ -393,10 +395,17 @@
           <option value="global">global</option>
         </select>
       </div>
-      <div class="form-group">
-        <label class="form-label">Team</label>
-        <input value={team} oninput={(e) => team = e.target.value} class="sb-input" placeholder="Team name" />
-      </div>
+      {#if scope === 'team'}
+        <div class="form-group">
+          <label class="form-label">Team</label>
+          <select value={team} onchange={(e) => team = e.target.value} class="sb-input">
+            <option value="">-- select team --</option>
+            {#each $teams as t}
+              <option value={t}>{t}</option>
+            {/each}
+          </select>
+        </div>
+      {/if}
     </div>
 
     <div class="form-group">

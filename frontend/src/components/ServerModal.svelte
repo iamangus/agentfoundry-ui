@@ -1,5 +1,6 @@
 <script>
   import { api } from '../lib/api.js'
+  import { teams, loadTeams } from '../lib/stores.js'
 
   let { server = null, onclose, oncreated } = $props()
 
@@ -15,6 +16,7 @@
   let formTeam = $state('')
 
   $effect(() => {
+    loadTeams()
     if (server) {
       formName = server.name
       formUrl = server.url
@@ -133,7 +135,12 @@
 
     {#if formScope === 'team'}
       <label class="modal-label">Team name</label>
-      <input class="sb-input" bind:value={formTeam} placeholder="my-team" />
+      <select class="sb-input" bind:value={formTeam}>
+        <option value="">-- select team --</option>
+        {#each $teams as t}
+          <option value={t}>{t}</option>
+        {/each}
+      </select>
     {/if}
 
     <div class="modal-actions">

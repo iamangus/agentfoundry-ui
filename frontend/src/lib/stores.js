@@ -3,6 +3,7 @@ import { api } from './api.js'
 
 export const user = writable(null)
 export const userLoading = writable(true)
+export const teams = writable([])
 
 export async function loadUser() {
   try {
@@ -12,6 +13,15 @@ export async function loadUser() {
     user.set(null)
   } finally {
     userLoading.set(false)
+  }
+}
+
+export async function loadTeams() {
+  try {
+    const data = await api.get('/api/v1/teams')
+    teams.set(data.teams || [])
+  } catch {
+    teams.set([])
   }
 }
 
