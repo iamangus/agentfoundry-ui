@@ -20,6 +20,7 @@ var (
 
 type Definition struct {
 	AgentID            string            `json:"agent_id,omitempty"`
+	ProviderID         string            `json:"provider_id,omitempty"`
 	Kind               Kind              `json:"kind"`
 	Name               string            `json:"name"`
 	Description        string            `json:"description,omitempty"`

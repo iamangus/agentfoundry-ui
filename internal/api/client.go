@@ -77,6 +77,34 @@ type SetToolScopeRequest struct {
 	Team  string `json:"team,omitempty"`
 }
 
+type ProviderInfo struct {
+	ID               string            `json:"id"`
+	Name             string            `json:"name"`
+	ProviderType     string            `json:"provider_type"`
+	BaseURL          string            `json:"base_url"`
+	APIKey           string            `json:"api_key,omitempty"`
+	DefaultModel     string            `json:"default_model"`
+	SchemaValidation bool              `json:"schema_validation"`
+	Headers          map[string]string `json:"headers,omitempty"`
+	Scope            string            `json:"scope"`
+	Team             string            `json:"team,omitempty"`
+	CreatedBy        string            `json:"created_by"`
+	CreatedAt        string            `json:"created_at"`
+	UpdatedAt        string            `json:"updated_at"`
+}
+
+type CreateProviderRequest struct {
+	Name             string            `json:"name"`
+	ProviderType     string            `json:"provider_type"`
+	BaseURL          string            `json:"base_url"`
+	APIKey           string            `json:"api_key"`
+	DefaultModel     string            `json:"default_model"`
+	SchemaValidation bool              `json:"schema_validation"`
+	Headers          map[string]string `json:"headers,omitempty"`
+	Scope            string            `json:"scope"`
+	Team             string            `json:"team,omitempty"`
+}
+
 type TokenProvider interface {
 	GetAccessToken(ctx context.Context) string
 }
@@ -547,6 +575,66 @@ func (c *Client) RefreshMCPServer(ctx context.Context, name string) error {
 	resp.Body.Close()
 	if resp.StatusCode >= 400 {
 		return fmt.Errorf("refresh mcp server: %s", resp.Status)
+	}
+	return nil
+}
+
+func (c *Client) ListProviders(ctx context.Context) ([]ProviderInfo, error) {
+	resp, err := c.get(ctx, "/api/v1/providers")
+	if err != nil {
+		return nil, err
+	}
+	var providers []ProviderInfo
+	if err := c.decodeJSON(resp, &providers); err != nil {
+		return nil, err
+	}
+	return providers, nil
+}
+
+func (c *Client) CreateProvider(ctx context.Context, req CreateProviderRequest) (*ProviderInfo, error) {
+	resp, err := c.postJSON(ctx, "/api/v1/providers", req)
+	if err != nil {
+		return nil, err
+	}
+	var provider ProviderInfo
+	if err := c.decodeJSON(resp, &provider); err != nil {
+		return nil, err
+	}
+	return &provider, nil
+}
+
+func (c *Client) GetProvider(ctx context.Context, name string) (*ProviderInfo, error) {
+	resp, err := c.get(ctx, "/api/v1/providers/"+url.PathEscape(name))
+	if err != nil {
+		return nil, err
+	}
+	var provider ProviderInfo
+	if err := c.decodeJSON(resp, &provider); err != nil {
+		return nil, err
+	}
+	return &provider, nil
+}
+
+func (c *Client) UpdateProvider(ctx context.Context, name string, req CreateProviderRequest) (*ProviderInfo, error) {
+	resp, err := c.putJSON(ctx, "/api/v1/providers/"+url.PathEscape(name), req)
+	if err != nil {
+		return nil, err
+	}
+	var provider ProviderInfo
+	if err := c.decodeJSON(resp, &provider); err != nil {
+		return nil, err
+	}
+	return &provider, nil
+}
+
+func (c *Client) DeleteProvider(ctx context.Context, name string) error {
+	resp, err := c.delete(ctx, "/api/v1/providers/"+url.PathEscape(name))
+	if err != nil {
+		return err
+	}
+	resp.Body.Close()
+	if resp.StatusCode >= 400 && resp.StatusCode != 404 {
+		return fmt.Errorf("delete provider: %s", resp.Status)
 	}
 	return nil
 }

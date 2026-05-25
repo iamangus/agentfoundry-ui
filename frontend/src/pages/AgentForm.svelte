@@ -18,7 +18,9 @@
 
   let availableServers = $state([])
   let availableAgents = $state([])
+  let availableProviders = $state([])
   let loading = $state(true)
+  let providerID = $state(def.provider_id || '')
   let enabledTools = $state({})
   let selectedServers = $state([])
   let expandedServer = $state(null)
@@ -32,11 +34,13 @@
   async function loadAll() {
     try {
       loading = true
-      const [servers, agents] = await Promise.all([
+      const [servers, providers, agents] = await Promise.all([
         api.get('/tools/servers/list'),
+        api.get('/api/v1/providers'),
         api.get('/agents/list')
       ])
       availableServers = servers
+      availableProviders = providers || []
       availableAgents = (agents || []).filter(a => a.name !== def.name)
       initFromDef()
     } catch (e) {
@@ -178,12 +182,13 @@
       }
     }
 
-    onsave({
-      originalName: def.name,
-      name,
-      description,
-      model,
-      system_prompt: systemPrompt,
+      onsave({
+        originalName: def.name,
+        name,
+        description,
+        model,
+        provider_id: providerID,
+        system_prompt: systemPrompt,
       tools,
       max_turns: maxTurns,
       max_concurrent_tools: maxConcurrentTools,
@@ -219,6 +224,16 @@
     <div class="form-group">
       <label class="form-label">Model</label>
       <input value={model} oninput={(e) => model = e.target.value} class="sb-input" placeholder="e.g. gpt-4o" />
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Inference Provider</label>
+      <select value={providerID} onchange={(e) => providerID = e.target.value} class="sb-input">
+        <option value="">-- none --</option>
+        {#each availableProviders as p}
+          <option value={p.id}>{p.name} ({p.provider_type})</option>
+        {/each}
+      </select>
     </div>
 
     <div class="form-group">

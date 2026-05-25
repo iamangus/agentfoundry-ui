@@ -4,6 +4,7 @@
   import Agents from './pages/Agents.svelte'
   import Tools from './pages/Tools.svelte'
   import ApiKeys from './pages/ApiKeys.svelte'
+  import Providers from './pages/Providers.svelte'
   import { loadUser } from './lib/stores.js'
 
   let page = $state(window.location.pathname)
@@ -26,7 +27,8 @@
         <Chat />
       {:else if page === '/agents'}
         <Agents />
-      {:else if page === '/tools'}
+      {:else if page === '/providers'}
+        <Providers />
         <Tools />
       {:else if page === '/api-keys'}
         <ApiKeys />
