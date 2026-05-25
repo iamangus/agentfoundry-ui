@@ -252,6 +252,7 @@ func (h *Handler) jsonCloneAgent(w http.ResponseWriter, r *http.Request) {
 
 	clone := *src
 	clone.Name = cloneName
+	clone.AgentID = ""
 	clone.Tools = append([]string(nil), src.Tools...)
 	if src.StructuredOutput != nil {
 		so := *src.StructuredOutput
