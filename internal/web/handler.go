@@ -513,6 +513,7 @@ func definitionFromJSON(r *http.Request) (*api.Definition, error) {
 		ForceJSON          bool                  `json:"force_json"`
 		Scope              string                `json:"scope"`
 		Team               string                `json:"team"`
+		ProviderID         string                `json:"provider_id"`
 		StructuredOutput   *api.StructuredOutput `json:"structured_output"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&formData); err != nil {
@@ -531,6 +532,7 @@ func definitionFromJSON(r *http.Request) (*api.Definition, error) {
 		ForceJSON:          formData.ForceJSON,
 		Scope:              formData.Scope,
 		Team:               formData.Team,
+		ProviderID:         formData.ProviderID,
 		StructuredOutput:   formData.StructuredOutput,
 	}
 	return def, nil
