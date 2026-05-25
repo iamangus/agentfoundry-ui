@@ -85,18 +85,18 @@ func (h *Handler) jsonSessionGet(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) jsonCreateSession(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		AgentName string `json:"agent_name"`
+		AgentID string `json:"agent_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid JSON: agent_name required", http.StatusBadRequest)
+		http.Error(w, "invalid JSON: agent_id required", http.StatusBadRequest)
 		return
 	}
-	if req.AgentName == "" {
-		http.Error(w, "agent_name is required", http.StatusBadRequest)
+	if req.AgentID == "" {
+		http.Error(w, "agent_id is required", http.StatusBadRequest)
 		return
 	}
 
-	sess, err := h.client.CreateSession(r.Context(), req.AgentName)
+	sess, err := h.client.CreateSession(r.Context(), req.AgentID)
 	if err != nil {
 		slog.Error("failed to create session", "error", err)
 		http.Error(w, "backend error", http.StatusBadGateway)

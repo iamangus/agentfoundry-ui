@@ -14,6 +14,7 @@ import (
 
 type Session struct {
 	ID          string    `json:"id"`
+	AgentID     string    `json:"agent_id"`
 	AgentName   string    `json:"agent_name"`
 	Messages    []Message `json:"messages"`
 	CreatedAt   time.Time `json:"created_at"`
@@ -284,8 +285,8 @@ func (c *Client) Rollback(ctx context.Context, name, versionID string) (*Definit
 	return &def, nil
 }
 
-func (c *Client) CreateSession(ctx context.Context, agentName string) (*Session, error) {
-	resp, err := c.postJSON(ctx, "/api/v1/chat/sessions", map[string]string{"agent_name": agentName})
+func (c *Client) CreateSession(ctx context.Context, agentID string) (*Session, error) {
+	resp, err := c.postJSON(ctx, "/api/v1/chat/sessions", map[string]string{"agent_id": agentID})
 	if err != nil {
 		return nil, err
 	}

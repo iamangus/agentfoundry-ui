@@ -67,7 +67,7 @@
   async function createSession() {
     if (!selectedAgent) return
     try {
-      const sess = await api.post('/chat/sessions', { agent_name: selectedAgent })
+      const sess = await api.post('/chat/sessions', { agent_id: selectedAgent })
       sessions = [sess, ...sessions]
       await selectSession(sess)
       await loadData()
@@ -186,7 +186,7 @@
           {:else}
             <option value="">Select agent...</option>
             {#each agents as a}
-              <option value={a.name}>{a.name}</option>
+              <option value={a.agent_id}>{a.name}</option>
             {/each}
           {/if}
         </select>
