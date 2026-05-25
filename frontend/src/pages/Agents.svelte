@@ -139,6 +139,7 @@
                     <p class="agent-description">{agent.description}</p>
                   {/if}
                   <div class="agent-meta">
+                    {#if agent.agent_id}<span class="meta-tag id-tag" title="Agent ID for API runs">{agent.agent_id}</span>{/if}
                     {#if agent.model}<span class="meta-tag">model: {agent.model}</span>{/if}
                     {#if agent.tools && agent.tools.length > 0}<span class="meta-tag">{agent.tools.length} tools</span>{/if}
                   </div>
@@ -262,5 +263,11 @@
     border: 1px solid oklch(59.1% 0.249 292.7 / 0.25);
     padding: 2px 8px;
     border-radius: 12px;
+  }
+  .id-tag {
+    font-family: monospace;
+    font-size: 0.65rem;
+    user-select: all;
+    cursor: copy;
   }
 </style>
