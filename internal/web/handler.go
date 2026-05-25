@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/angoo/agentfoundry-ui/internal/api"
 )
@@ -468,6 +469,26 @@ func (h *Handler) proxyBackend(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	w.WriteHeader(resp.StatusCode)
+
+	ct := resp.Header.Get("Content-Type")
+	if strings.HasPrefix(ct, "text/event-stream") {
+		rc := http.NewResponseController(w)
+		buf := make([]byte, 4096)
+		for {
+			n, err := resp.Body.Read(buf)
+			if n > 0 {
+				w.Write(buf[:n])
+				rc.Flush()
+			}
+			if err != nil {
+				if err != io.EOF {
+					slog.Error("proxy stream read error", "error", err)
+				}
+				return
+			}
+		}
+	}
+
 	io.Copy(w, resp.Body)
 }
 
