@@ -41,6 +41,16 @@ type StructuredOutput struct {
 	Strict bool            `json:"strict,omitempty"`
 }
 
+type AgentVersion struct {
+	VersionID    string `json:"version_id"`
+	LastModified string `json:"last_modified"`
+	IsLatest     bool   `json:"is_latest"`
+}
+
+type VersionsResponse struct {
+	Versions []AgentVersion `json:"versions"`
+}
+
 func (d *Definition) Validate() error {
 	if d.Name == "" {
 		return ErrMissingName

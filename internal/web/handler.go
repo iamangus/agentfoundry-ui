@@ -42,6 +42,9 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /agents/{name}/clone", h.jsonCloneAgent)
 	mux.HandleFunc("DELETE /agents/{name}", h.jsonDeleteAgent)
 
+	mux.HandleFunc("GET /agents/{name}/versions", h.jsonListVersions)
+	mux.HandleFunc("POST /agents/{name}/rollback", h.jsonRollback)
+
 	mux.HandleFunc("GET /tools/servers/list", h.jsonMCPServerList)
 	mux.HandleFunc("POST /tools/servers", h.jsonCreateMCPServer)
 	mux.HandleFunc("GET /tools/servers/{name}", h.jsonGetMCPServer)
@@ -271,6 +274,33 @@ func (h *Handler) jsonDeleteAgent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) jsonListVersions(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	versions, err := h.client.ListVersions(r.Context(), name)
+	if err != nil {
+		slog.Error("failed to list versions", "name", name, "error", err)
+		http.Error(w, "backend error", http.StatusBadGateway)
+		return
+	}
+	writeJSON(w, versions)
+}
+
+func (h *Handler) jsonRollback(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	versionID := r.URL.Query().Get("version_id")
+	if versionID == "" {
+		http.Error(w, "version_id query parameter required", http.StatusBadRequest)
+		return
+	}
+	def, err := h.client.Rollback(r.Context(), name, versionID)
+	if err != nil {
+		slog.Error("failed to rollback", "name", name, "version", versionID, "error", err)
+		http.Error(w, "rollback failed", http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, def)
 }
 
 func (h *Handler) jsonMCPServerList(w http.ResponseWriter, r *http.Request) {

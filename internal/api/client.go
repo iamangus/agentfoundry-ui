@@ -234,6 +234,56 @@ func (c *Client) DeleteAgent(ctx context.Context, name string) error {
 	return nil
 }
 
+func (c *Client) ListVersions(ctx context.Context, name string) (*VersionsResponse, error) {
+	resp, err := c.get(ctx, "/api/v1/agents/"+url.PathEscape(name)+"/versions")
+	if err != nil {
+		return nil, err
+	}
+	var versions VersionsResponse
+	if err := c.decodeJSON(resp, &versions); err != nil {
+		return nil, err
+	}
+	return &versions, nil
+}
+
+func (c *Client) GetVersion(ctx context.Context, name, versionID string) (json.RawMessage, error) {
+	u := c.baseURL.JoinPath("/api/v1/agents/" + url.PathEscape(name) + "/version")
+	u.RawQuery = "version_id=" + url.QueryEscape(versionID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	c.withAuth(req)
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	var raw json.RawMessage
+	if err := c.decodeJSON(resp, &raw); err != nil {
+		return nil, err
+	}
+	return raw, nil
+}
+
+func (c *Client) Rollback(ctx context.Context, name, versionID string) (*Definition, error) {
+	u := c.baseURL.JoinPath("/api/v1/agents/" + url.PathEscape(name) + "/rollback")
+	u.RawQuery = "version_id=" + url.QueryEscape(versionID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	c.withAuth(req)
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	var def Definition
+	if err := c.decodeJSON(resp, &def); err != nil {
+		return nil, err
+	}
+	return &def, nil
+}
+
 func (c *Client) CreateSession(ctx context.Context, agentName string) (*Session, error) {
 	resp, err := c.postJSON(ctx, "/api/v1/chat/sessions", map[string]string{"agent_name": agentName})
 	if err != nil {
