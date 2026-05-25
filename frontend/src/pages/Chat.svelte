@@ -30,7 +30,7 @@
     try {
       const [a, s] = await Promise.all([
         api.get('/agents/list'),
-        api.get('/chat/sessions/list')
+        api.get('/api/v1/chat/sessions')
       ])
       agents = a
       sessions = s
@@ -54,7 +54,7 @@
     currentSession = session
     navigate('/chat?session=' + session.id)
     try {
-      const full = await api.get('/chat/sessions/' + session.id)
+      const full = await api.get('/api/v1/chat/sessions/' + session.id)
       messages = full.messages || []
       if (full.active_run_id) {
         startStream(full.active_run_id)
@@ -67,7 +67,7 @@
   async function createSession() {
     if (!selectedAgent) return
     try {
-      const sess = await api.post('/chat/sessions', { agent_id: selectedAgent })
+      const sess = await api.post('/api/v1/chat/sessions', { agent_id: selectedAgent })
       sessions = [sess, ...sessions]
       await selectSession(sess)
       await loadData()
@@ -84,7 +84,7 @@
     requestAnimationFrame(() => scrollDown())
 
     try {
-      const result = await api.post('/chat/sessions/' + currentSession.id + '/messages', { message: content })
+      const result = await api.post('/api/v1/chat/sessions/' + currentSession.id + '/messages', { message: content })
       startStream(result.run_id)
     } catch (e) {
       console.error('Failed to send message', e)
