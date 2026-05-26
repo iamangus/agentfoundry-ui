@@ -29,6 +29,7 @@
         <Agents />
       {:else if page === '/providers'}
         <Providers />
+      {:else if page === '/tools'}
         <Tools />
       {:else if page === '/api-keys'}
         <ApiKeys />
