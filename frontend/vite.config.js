@@ -13,6 +13,7 @@ export default defineConfig({
       '/agents': 'http://localhost:8080',
       '/tools': 'http://localhost:8080',
       '/api/keys': 'http://localhost:8080',
+      '/api/v1': 'http://localhost:8080',
       '/auth': 'http://localhost:8080',
     },
   },

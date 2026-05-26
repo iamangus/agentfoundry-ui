@@ -5,6 +5,7 @@
   import Tools from './pages/Tools.svelte'
   import ApiKeys from './pages/ApiKeys.svelte'
   import Providers from './pages/Providers.svelte'
+  import Executions from './pages/Executions.svelte'
   import { loadUser } from './lib/stores.js'
 
   let page = $state(window.location.pathname)
@@ -33,6 +34,8 @@
         <Tools />
       {:else if page === '/api-keys'}
         <ApiKeys />
+      {:else if page === '/executions'}
+        <Executions />
       {:else}
         <Chat />
       {/if}
