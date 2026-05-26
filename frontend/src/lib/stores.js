@@ -1,4 +1,4 @@
-import { writable } from 'svelte/store'
+import { writable, get } from 'svelte/store'
 import { api } from './api.js'
 
 export const user = writable(null)
@@ -52,10 +52,9 @@ function createThemeStore() {
       set(value)
     },
     toggle: () => {
-      subscribe((current) => {
-        const next = current === 'system' ? 'dark' : current === 'dark' ? 'light' : 'system'
-        theme.set(next)
-      })()
+      const current = get(theme)
+      const next = current === 'system' ? 'dark' : current === 'dark' ? 'light' : 'system'
+      theme.set(next)
     },
   }
 }
