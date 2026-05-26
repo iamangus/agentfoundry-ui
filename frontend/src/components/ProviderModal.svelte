@@ -93,6 +93,7 @@
     error = ''
     try {
       const body = {
+        name: formName.trim(),
         provider_type: formProviderType,
         base_url: formBaseURL.trim(),
         api_key: formAPIKey.trim(),
@@ -102,7 +103,7 @@
         scope: formScope,
         team: formScope === 'team' ? formTeam.trim() : ''
       }
-      await api.put('/api/v1/providers/' + encodeURIComponent(provider.name), body)
+      await api.put('/api/v1/providers/' + encodeURIComponent(provider.id), body)
       oncreated()
     } catch (e) {
       error = e.message || 'Failed to update'
@@ -121,7 +122,7 @@
     {/if}
 
     <label class="modal-label">Name</label>
-    <input class="sb-input" bind:value={formName} placeholder="my-provider" disabled={isEdit} />
+    <input class="sb-input" bind:value={formName} placeholder="my-provider" />
 
     <label class="modal-label">Provider Type</label>
     <select class="sb-input" bind:value={formProviderType}>

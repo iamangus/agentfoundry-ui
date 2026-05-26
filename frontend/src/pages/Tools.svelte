@@ -48,15 +48,15 @@
     loadMCPServers()
   }
 
-  function toggleExpand(name) {
-    expandedServer = expandedServer === name ? null : name
+  function toggleExpand(id) {
+    expandedServer = expandedServer === id ? null : id
   }
 
-  async function deleteServer(name) {
-    if (!confirm(`Delete MCP server "${name}"? This will disconnect it.`)) return
+  async function deleteServer(id) {
+    if (!confirm(`Delete MCP server "${mcpServers.find(s => s.id === id)?.name}"? This will disconnect it.`)) return
     try {
-      await api.del('/tools/servers/' + name)
-      if (expandedServer === name) expandedServer = null
+      await api.del('/tools/servers/' + encodeURIComponent(id))
+      if (expandedServer === id) expandedServer = null
       loadMCPServers()
     } catch (e) {
       console.error('Failed to delete server', e)
@@ -64,10 +64,10 @@
     }
   }
 
-  async function refreshServer(name) {
+  async function refreshServer(id) {
     serverLoading = true
     try {
-      await api.post('/tools/servers/' + name + '/refresh', {})
+      await api.post('/tools/servers/' + encodeURIComponent(id) + '/refresh', {})
       if (refreshTimer) clearTimeout(refreshTimer)
       refreshTimer = setTimeout(() => {
         refreshTimer = null
@@ -80,9 +80,9 @@
     }
   }
 
-  async function setToolScope(serverName, toolName, scope) {
+  async function setToolScope(serverID, toolName, scope) {
     try {
-      await api.put('/tools/servers/' + serverName + '/tools/' + encodeURIComponent(toolName), { scope })
+      await api.put('/tools/servers/' + encodeURIComponent(serverID) + '/tools/' + encodeURIComponent(toolName), { scope })
       loadMCPServers()
     } catch (e) {
       console.error('Failed to set tool scope', e)
@@ -119,8 +119,8 @@
   {:else}
     <div class="server-cards">
       {#each mcpServers as srv}
-        <div class="server-card" class:expanded={expandedServer === srv.name}>
-          <div class="server-card-header" onclick={() => toggleExpand(srv.name)} onkeydown={(e) => { if (e.key === 'Enter') toggleExpand(srv.name) }} role="button" tabindex="0">
+        <div class="server-card" class:expanded={expandedServer === srv.id}>
+          <div class="server-card-header" onclick={() => toggleExpand(srv.id)} onkeydown={(e) => { if (e.key === 'Enter') toggleExpand(srv.id) }} role="button" tabindex="0">
             <div class="server-card-main">
               <span class="server-name">{srv.name}</span>
               <span class="server-url">{srv.url}</span>
@@ -129,16 +129,16 @@
               <span class="status-dot" class:connected={srv.connected} class:disconnected={!srv.connected}></span>
               <span class="scope-badge scope-{scopeBadge(srv.scope)}">{scopeBadge(srv.scope)}</span>
               <span class="tool-count">{srv.tools.length} tools</span>
-              <span class="expand-arrow">{expandedServer === srv.name ? '▾' : '▸'}</span>
+              <span class="expand-arrow">{expandedServer === srv.id ? '▾' : '▸'}</span>
             </div>
           </div>
 
-          {#if expandedServer === srv.name}
+          {#if expandedServer === srv.id}
             <div class="server-card-body">
               <div class="server-card-actions">
                 <button class="action-btn" onclick={() => openEditModal(srv)}>Edit</button>
-                <button class="action-btn action-btn-refresh" onclick={() => refreshServer(srv.name)} disabled={serverLoading}>Refresh</button>
-                <button class="action-btn action-btn-delete" onclick={() => deleteServer(srv.name)}>Delete</button>
+                <button class="action-btn action-btn-refresh" onclick={() => refreshServer(srv.id)} disabled={serverLoading}>Refresh</button>
+                <button class="action-btn action-btn-delete" onclick={() => deleteServer(srv.id)}>Delete</button>
               </div>
 
               {#if srv.tools.length > 0}
@@ -157,7 +157,7 @@
                           <td class="tool-name-cell">{tool.name}</td>
                           <td class="tool-desc-cell">{tool.description || '—'}</td>
                           <td class="tool-scope-cell">
-                            <select class="scope-select" value={tool.scope} onchange={(e) => setToolScope(srv.name, tool.name, e.target.value)}>
+                            <select class="scope-select" value={tool.scope} onchange={(e) => setToolScope(srv.id, tool.name, e.target.value)}>
                               <option value="user">personal</option>
                               <option value="team">team</option>
                               <option value="global">global</option>

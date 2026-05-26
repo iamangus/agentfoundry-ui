@@ -43,15 +43,15 @@
     loadProviders()
   }
 
-  function toggleExpand(name) {
-    expandedProvider = expandedProvider === name ? null : name
+  function toggleExpand(id) {
+    expandedProvider = expandedProvider === id ? null : id
   }
 
-  async function deleteProvider(name) {
-    if (!confirm(`Delete provider "${name}"?`)) return
+  async function deleteProvider(prov) {
+    if (!confirm(`Delete provider "${prov.name}"?`)) return
     try {
-      await api.del('/api/v1/providers/' + encodeURIComponent(name))
-      if (expandedProvider === name) expandedProvider = null
+      await api.del('/api/v1/providers/' + encodeURIComponent(prov.id))
+      if (expandedProvider === prov.id) expandedProvider = null
       loadProviders()
     } catch (e) {
       console.error('Failed to delete provider', e)
@@ -94,8 +94,8 @@
   {:else}
     <div class="provider-cards">
       {#each providers as prov}
-        <div class="provider-card" class:expanded={expandedProvider === prov.name}>
-          <div class="provider-card-header" onclick={() => toggleExpand(prov.name)} onkeydown={(e) => { if (e.key === 'Enter') toggleExpand(prov.name) }} role="button" tabindex="0">
+        <div class="provider-card" class:expanded={expandedProvider === prov.id}>
+          <div class="provider-card-header" onclick={() => toggleExpand(prov.id)} onkeydown={(e) => { if (e.key === 'Enter') toggleExpand(prov.id) }} role="button" tabindex="0">
             <div class="provider-card-main">
               <span class="provider-name">{prov.name}</span>
               <div class="provider-meta-row">
@@ -106,11 +106,11 @@
             <div class="provider-card-meta">
               <span class="model-name">{prov.default_model || '—'}</span>
               <span class="scope-badge scope-{scopeBadge(prov.scope)}">{scopeBadge(prov.scope)}</span>
-              <span class="expand-arrow">{expandedProvider === prov.name ? '▾' : '▸'}</span>
+              <span class="expand-arrow">{expandedProvider === prov.id ? '▾' : '▸'}</span>
             </div>
           </div>
 
-          {#if expandedProvider === prov.name}
+          {#if expandedProvider === prov.id}
             <div class="provider-card-body">
               <div class="provider-card-details">
                 <div class="detail-row">
@@ -134,7 +134,7 @@
               </div>
               <div class="provider-card-actions">
                 <button class="action-btn" onclick={() => openEditModal(prov)}>Edit</button>
-                <button class="action-btn action-btn-delete" onclick={() => deleteProvider(prov.name)}>Delete</button>
+                <button class="action-btn action-btn-delete" onclick={() => deleteProvider(prov)}>Delete</button>
               </div>
             </div>
           {/if}

@@ -531,8 +531,8 @@ func (c *Client) GetMCPServer(ctx context.Context, name string) (*MCPServerInfo,
 	return &server, nil
 }
 
-func (c *Client) UpdateMCPServer(ctx context.Context, name string, req CreateMCPServerRequest) (*MCPServerInfo, error) {
-	resp, err := c.putJSON(ctx, "/api/v1/mcp-servers/"+url.PathEscape(name), req)
+func (c *Client) UpdateMCPServer(ctx context.Context, id string, req CreateMCPServerRequest) (*MCPServerInfo, error) {
+	resp, err := c.putJSON(ctx, "/api/v1/mcp-servers/"+url.PathEscape(id), req)
 	if err != nil {
 		return nil, err
 	}
@@ -543,8 +543,8 @@ func (c *Client) UpdateMCPServer(ctx context.Context, name string, req CreateMCP
 	return &server, nil
 }
 
-func (c *Client) DeleteMCPServer(ctx context.Context, name string) error {
-	resp, err := c.delete(ctx, "/api/v1/mcp-servers/"+url.PathEscape(name))
+func (c *Client) DeleteMCPServer(ctx context.Context, id string) error {
+	resp, err := c.delete(ctx, "/api/v1/mcp-servers/"+url.PathEscape(id))
 	if err != nil {
 		return err
 	}
@@ -555,8 +555,8 @@ func (c *Client) DeleteMCPServer(ctx context.Context, name string) error {
 	return nil
 }
 
-func (c *Client) SetToolScope(ctx context.Context, serverName, toolName string, req SetToolScopeRequest) error {
-	resp, err := c.putJSON(ctx, "/api/v1/mcp-servers/"+url.PathEscape(serverName)+"/tools/"+url.PathEscape(toolName), req)
+func (c *Client) SetToolScope(ctx context.Context, serverID, toolName string, req SetToolScopeRequest) error {
+	resp, err := c.putJSON(ctx, "/api/v1/mcp-servers/"+url.PathEscape(serverID)+"/tools/"+url.PathEscape(toolName), req)
 	if err != nil {
 		return err
 	}
@@ -567,8 +567,8 @@ func (c *Client) SetToolScope(ctx context.Context, serverName, toolName string, 
 	return nil
 }
 
-func (c *Client) RefreshMCPServer(ctx context.Context, name string) error {
-	resp, err := c.postJSON(ctx, "/api/v1/mcp-servers/"+url.PathEscape(name)+"/refresh", nil)
+func (c *Client) RefreshMCPServer(ctx context.Context, id string) error {
+	resp, err := c.postJSON(ctx, "/api/v1/mcp-servers/"+url.PathEscape(id)+"/refresh", nil)
 	if err != nil {
 		return err
 	}
@@ -615,8 +615,8 @@ func (c *Client) GetProvider(ctx context.Context, name string) (*ProviderInfo, e
 	return &provider, nil
 }
 
-func (c *Client) UpdateProvider(ctx context.Context, name string, req CreateProviderRequest) (*ProviderInfo, error) {
-	resp, err := c.putJSON(ctx, "/api/v1/providers/"+url.PathEscape(name), req)
+func (c *Client) UpdateProvider(ctx context.Context, id string, req CreateProviderRequest) (*ProviderInfo, error) {
+	resp, err := c.putJSON(ctx, "/api/v1/providers/"+url.PathEscape(id), req)
 	if err != nil {
 		return nil, err
 	}
@@ -627,8 +627,8 @@ func (c *Client) UpdateProvider(ctx context.Context, name string, req CreateProv
 	return &provider, nil
 }
 
-func (c *Client) DeleteProvider(ctx context.Context, name string) error {
-	resp, err := c.delete(ctx, "/api/v1/providers/"+url.PathEscape(name))
+func (c *Client) DeleteProvider(ctx context.Context, id string) error {
+	resp, err := c.delete(ctx, "/api/v1/providers/"+url.PathEscape(id))
 	if err != nil {
 		return err
 	}

@@ -49,10 +49,10 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /tools/servers/list", h.jsonMCPServerList)
 	mux.HandleFunc("POST /tools/servers", h.jsonCreateMCPServer)
 	mux.HandleFunc("GET /tools/servers/{name}", h.jsonGetMCPServer)
-	mux.HandleFunc("PUT /tools/servers/{name}", h.jsonUpdateMCPServer)
-	mux.HandleFunc("DELETE /tools/servers/{name}", h.jsonDeleteMCPServer)
-	mux.HandleFunc("PUT /tools/servers/{name}/tools/{tool}", h.jsonSetToolScope)
-	mux.HandleFunc("POST /tools/servers/{name}/refresh", h.jsonRefreshMCPServer)
+	mux.HandleFunc("PUT /tools/servers/{id}", h.jsonUpdateMCPServer)
+	mux.HandleFunc("DELETE /tools/servers/{id}", h.jsonDeleteMCPServer)
+	mux.HandleFunc("PUT /tools/servers/{id}/tools/{tool}", h.jsonSetToolScope)
+	mux.HandleFunc("POST /tools/servers/{id}/refresh", h.jsonRefreshMCPServer)
 
 	mux.HandleFunc("GET /api/keys", h.jsonAPIKeysList)
 	mux.HandleFunc("POST /api/keys", h.jsonCreateAPIKey)
@@ -353,16 +353,16 @@ func (h *Handler) jsonGetMCPServer(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) jsonUpdateMCPServer(w http.ResponseWriter, r *http.Request) {
-	name := r.PathValue("name")
+	id := r.PathValue("id")
 	var req api.CreateMCPServerRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
 		return
 	}
 
-	server, err := h.client.UpdateMCPServer(r.Context(), name, req)
+	server, err := h.client.UpdateMCPServer(r.Context(), id, req)
 	if err != nil {
-		slog.Error("failed to update mcp server", "name", name, "error", err)
+		slog.Error("failed to update mcp server", "id", id, "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -370,9 +370,9 @@ func (h *Handler) jsonUpdateMCPServer(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) jsonDeleteMCPServer(w http.ResponseWriter, r *http.Request) {
-	name := r.PathValue("name")
-	if err := h.client.DeleteMCPServer(r.Context(), name); err != nil {
-		slog.Error("failed to delete mcp server", "name", name, "error", err)
+	id := r.PathValue("id")
+	if err := h.client.DeleteMCPServer(r.Context(), id); err != nil {
+		slog.Error("failed to delete mcp server", "id", id, "error", err)
 		http.Error(w, "failed to delete", http.StatusInternalServerError)
 		return
 	}
@@ -380,15 +380,15 @@ func (h *Handler) jsonDeleteMCPServer(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) jsonSetToolScope(w http.ResponseWriter, r *http.Request) {
-	serverName := r.PathValue("name")
+	serverID := r.PathValue("id")
 	toolName := r.PathValue("tool")
 	var req api.SetToolScopeRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
 		return
 	}
-	if err := h.client.SetToolScope(r.Context(), serverName, toolName, req); err != nil {
-		slog.Error("failed to set tool scope", "server", serverName, "tool", toolName, "error", err)
+	if err := h.client.SetToolScope(r.Context(), serverID, toolName, req); err != nil {
+		slog.Error("failed to set tool scope", "server", serverID, "tool", toolName, "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -396,9 +396,9 @@ func (h *Handler) jsonSetToolScope(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) jsonRefreshMCPServer(w http.ResponseWriter, r *http.Request) {
-	name := r.PathValue("name")
-	if err := h.client.RefreshMCPServer(r.Context(), name); err != nil {
-		slog.Error("failed to refresh mcp server", "name", name, "error", err)
+	id := r.PathValue("id")
+	if err := h.client.RefreshMCPServer(r.Context(), id); err != nil {
+		slog.Error("failed to refresh mcp server", "id", id, "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

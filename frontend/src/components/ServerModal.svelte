@@ -91,7 +91,7 @@
         scope: formScope,
         team: formScope === 'team' ? formTeam.trim() : ''
       }
-      await api.put('/tools/servers/' + server.name, body)
+      await api.put('/tools/servers/' + server.id, body)
       oncreated()
     } catch (e) {
       error = e.message || 'Failed to update'
@@ -112,7 +112,7 @@
     {/if}
 
     <label class="modal-label">Name</label>
-    <input class="sb-input" bind:value={formName} placeholder="my-mcp-server" disabled={isEdit} />
+    <input class="sb-input" bind:value={formName} placeholder="my-mcp-server" />
 
     <label class="modal-label">URL</label>
     <input class="sb-input" bind:value={formUrl} placeholder="http://localhost:8080/sse" />
