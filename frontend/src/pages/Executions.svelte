@@ -3,20 +3,24 @@
 
   let executions = $state([])
   let loading = $state(true)
-  let expandedExec = $state(null)
-  let history = $state(null)
-  let historyLoading = $state(false)
+  let expandedExecs = $state(new Set())
+  let histories = $state({})
   let statusFilter = $state('')
   let expandedEvent = $state(null)
-  let viewMode = $state('events')
   let selectedSpan = $state(null)
+  let selectedSpanExecId = $state(null)
 
   $effect(() => {
     loadExecutions()
+    const interval = setInterval(() => {
+      loadExecutions(true)
+      refreshExpandedHistories()
+    }, 1000)
+    return () => clearInterval(interval)
   })
 
-  async function loadExecutions() {
-    loading = true
+  async function loadExecutions(silent = false) {
+    if (!silent) loading = true
     try {
       let url = '/api/v1/executions'
       if (statusFilter) url += '?status=' + statusFilter
@@ -24,42 +28,61 @@
     } catch (e) {
       console.error('Failed to load executions', e)
     } finally {
-      loading = false
+      if (!silent) loading = false
     }
   }
 
+  async function refreshExpandedHistories() {
+    const ids = [...expandedExecs]
+    if (!ids.length) return
+    const results = await Promise.allSettled(
+      ids.map(id => api.get(`/api/v1/executions/${id}`))
+    )
+    results.forEach((r, i) => {
+      if (r.status === 'fulfilled') {
+        histories[ids[i]] = { ...histories[ids[i]], data: r.value }
+      }
+    })
+    histories = { ...histories }
+  }
+
   async function toggleExpand(execId) {
-    if (expandedExec === execId) {
-      expandedExec = null
-      history = null
+    if (expandedExecs.has(execId)) {
+      expandedExecs.delete(execId)
+      expandedExecs = new Set(expandedExecs)
       expandedEvent = null
-      viewMode = 'events'
       selectedSpan = null
+      selectedSpanExecId = null
       return
     }
-    expandedExec = execId
-    history = null
+    expandedExecs.add(execId)
+    expandedExecs = new Set(expandedExecs)
     expandedEvent = null
-    viewMode = 'events'
     selectedSpan = null
-    historyLoading = true
-    try {
-      history = await api.get(`/api/v1/executions/${execId}`)
-    } catch (e) {
-      console.error('Failed to load execution history', e)
-    } finally {
-      historyLoading = false
+    selectedSpanExecId = null
+    if (!histories[execId]?.data) {
+      histories[execId] = { ...histories[execId], loading: true }
+      histories = { ...histories }
+      try {
+        const data = await api.get(`/api/v1/executions/${execId}`)
+        histories[execId] = { loading: false, data }
+        histories = { ...histories }
+      } catch (e) {
+        console.error('Failed to load execution history', e)
+        histories[execId] = { ...histories[execId], loading: false }
+        histories = { ...histories }
+      }
     }
   }
 
   function formatTime(t) {
-    if (!t) return '—'
+    if (!t) return '\u2014'
     const d = new Date(t)
     return d.toLocaleString()
   }
 
   function formatDuration(start, end) {
-    if (!start) return '—'
+    if (!start) return '\u2014'
     const s = new Date(start).getTime()
     const e = end ? new Date(end).getTime() : Date.now()
     const ms = e - s
@@ -97,7 +120,6 @@
     if (eventType.startsWith('ActivityTask')) return 'event-activity'
     if (eventType.startsWith('ChildWorkflow') || eventType.startsWith('StartChildWorkflow')) return 'event-child'
     if (eventType.startsWith('Timer')) return 'event-timer'
-    if (eventType.startsWith('WorkflowTask')) return 'event-task'
     return 'event-default'
   }
 
@@ -110,7 +132,6 @@
       case 'activity': return 'span-activity'
       case 'child_workflow': return 'span-child'
       case 'timer': return 'span-timer'
-      case 'workflow_task': return 'span-task'
       default: return 'span-default'
     }
   }
@@ -122,8 +143,9 @@
   }
 
   function eventsForSpan(span) {
-    if (!history || !span) return []
-    return history.history.filter(e =>
+    const hx = selectedSpanExecId ? histories[selectedSpanExecId]?.data : null
+    if (!hx || !span) return []
+    return hx.history.filter(e =>
       e.event_id >= span.start_event_id && e.event_id <= span.end_event_id
     )
   }
@@ -135,8 +157,32 @@
     return ((ts - globalStart) / total) * 100
   }
 
-  function selectSpan(span) {
-    selectedSpan = selectedSpan && selectedSpan.id === span.id ? null : span
+  function selectSpan(span, execId) {
+    if (selectedSpan && selectedSpan.id === span.id && selectedSpanExecId === execId) {
+      selectedSpan = null
+      selectedSpanExecId = null
+    } else {
+      selectedSpan = span
+      selectedSpanExecId = execId
+    }
+  }
+
+  function spanDisplayName(span, hx) {
+    const agentName = hx?.agent_name || 'Agent'
+    switch (span.name) {
+      case 'ResolveAgentActivity': return `Getting ${agentName} Config`
+      case 'BuildToolDefsActivity': return 'Building Tool List'
+      case 'LLMChatActivity': return `Running ${agentName}`
+      case 'CallToolActivity': return getCallToolLabel(span, hx)
+      default: return span.name || span.type
+    }
+  }
+
+  function getCallToolLabel(span, hx) {
+    if (!hx) return 'Running Tool'
+    const event = hx.history?.find(e => e.event_id === span.start_event_id)
+    const toolName = event?.details?.activityTaskScheduledEventAttributes?.input?.payloads?.[0]?.tool_name
+    return toolName ? `Running ${toolName}` : 'Running Tool'
   }
 </script>
 
@@ -168,8 +214,10 @@
     </div>
   {:else}
     <div class="execution-cards">
-      {#each executions as exec}
-        <div class="execution-card" class:expanded={expandedExec === exec.workflow_id}>
+      {#each executions as exec (exec.workflow_id)}
+        {@const hstate = histories[exec.workflow_id]}
+        {@const hx = hstate?.data}
+        <div class="execution-card" class:expanded={expandedExecs.has(exec.workflow_id)}>
           <div class="execution-card-header" onclick={() => toggleExpand(exec.workflow_id)} onkeydown={(e) => { if (e.key === 'Enter') toggleExpand(exec.workflow_id) }} role="button" tabindex="0">
             <div class="execution-card-main">
               <div class="execution-title-row">
@@ -184,88 +232,82 @@
               <span class="status-badge {statusClass(exec.status)}">{statusLabel(exec.status)}</span>
               <span class="execution-time">{formatTime(exec.start_time)}</span>
               <span class="execution-duration">{formatDuration(exec.start_time, exec.close_time)}</span>
-              <span class="expand-arrow">{expandedExec === exec.workflow_id ? '▾' : '▸'}</span>
+              <span class="expand-arrow">{expandedExecs.has(exec.workflow_id) ? '\u25BE' : '\u25B8'}</span>
             </div>
           </div>
 
-          {#if expandedExec === exec.workflow_id}
+          {#if expandedExecs.has(exec.workflow_id)}
             <div class="execution-card-body">
-              {#if historyLoading}
+              {#if hstate?.loading}
                 <p style="color:var(--text-muted); padding:16px;">Loading timeline...</p>
-              {:else if history}
+              {:else if hx}
                 <div class="execution-detail-header">
                   <div class="detail-row">
                     <span class="detail-label">Workflow ID</span>
-                    <span class="detail-value"><code>{history.workflow_id}</code></span>
+                    <span class="detail-value"><code>{hx.workflow_id}</code></span>
                   </div>
                   <div class="detail-row">
                     <span class="detail-label">Run ID</span>
-                    <span class="detail-value"><code>{history.run_id || '—'}</code></span>
+                    <span class="detail-value"><code>{hx.run_id || '\u2014'}</code></span>
                   </div>
                   <div class="detail-row">
                     <span class="detail-label">Agent</span>
-                    <span class="detail-value">{history.agent_name || '—'}</span>
+                    <span class="detail-value">{hx.agent_name || '\u2014'}</span>
                   </div>
                   <div class="detail-row">
                     <span class="detail-label">Status</span>
-                    <span class="detail-value"><span class="status-badge {statusClass(history.status)}">{statusLabel(history.status)}</span></span>
+                    <span class="detail-value"><span class="status-badge {statusClass(hx.status)}">{statusLabel(hx.status)}</span></span>
                   </div>
                   <div class="detail-row">
                     <span class="detail-label">Started</span>
-                    <span class="detail-value">{formatTime(history.start_time)}</span>
+                    <span class="detail-value">{formatTime(hx.start_time)}</span>
                   </div>
                   <div class="detail-row">
                     <span class="detail-label">Duration</span>
-                    <span class="detail-value">{formatDuration(history.start_time, history.close_time)}</span>
+                    <span class="detail-value">{formatDuration(hx.start_time, hx.close_time)}</span>
                   </div>
                 </div>
-                <div class="view-toggle-bar">
-                  <button class="view-toggle-btn" class:active={viewMode === 'events'} onclick={() => { viewMode = 'events'; selectedSpan = null }}>Events</button>
-                  {#if history.spans && history.spans.length > 0}
-                    <button class="view-toggle-btn" class:active={viewMode === 'timeline'} onclick={() => { viewMode = 'timeline'; expandedEvent = null }}>Timeline</button>
-                  {/if}
-                </div>
-                {#if viewMode === 'timeline' && history.spans && history.spans.length > 0}
-                  {@const globalStart = history.spans.length > 0 ? new Date(history.spans[0].start_time).getTime() : 0}
-                  {@const globalEnd = history.close_time ? new Date(history.close_time).getTime() : Date.now()}
+                {#if hx.spans && hx.spans.length > 0}
+                  {@const globalStart = new Date(hx.spans[0].start_time).getTime()}
+                  {@const globalEnd = hx.close_time ? new Date(hx.close_time).getTime() : Date.now()}
                   <div class="spans-chart">
                     <div class="spans-time-header">
-                      <span class="spans-time-label">{spanTime(history.spans[0]?.start_time)}</span>
-                      <span class="spans-time-label">{spanTime(history.close_time)}</span>
+                      <span class="spans-time-label">{spanTime(hx.spans[0]?.start_time)}</span>
+                      <span class="spans-time-label">{spanTime(hx.close_time)}</span>
                     </div>
-                     {#each history.spans as span}
-                      {@const sp = timelinePct(span.start_time, globalStart, globalEnd)}
-                      {@const ep = timelinePct(span.end_time, globalStart, globalEnd)}
-                      {@const bw = Math.max(0.1, ep - sp)}
-                      {@const barFits = bw > 20}
-                      {@const flip = !barFits && ep > 85}
-                      <div class="span-row" class:selected={selectedSpan && selectedSpan.id === span.id}>
-                        <div class="span-track">
-                          <div
-                            class="span-bar {spanColor(span.type)}"
-                            style="left: {sp}%; width: {bw}%"
-                            onclick={() => selectSpan(span)}
-                            onkeydown={(e) => { if (e.key === 'Enter') selectSpan(span) }}
-                            role="button"
-                            tabindex="0"
-                            title={span.name + ': ' + formatDuration(span.start_time, span.end_time)}
-                          >
-                            {#if barFits}
-                              <span class="span-bar-label">{span.name || span.type}</span>
-                            {/if}
-                          </div>
-                          {#if !barFits}
-                            <span class="span-name-label" class:span-name-label--left={flip} style={flip ? `right: ${100 - sp}%` : `left: ${ep}%`}>{span.name || span.type}</span>
-                          {/if}
-                        </div>
-                        <span class="span-duration">{formatDuration(span.start_time, span.end_time)}</span>
-                      </div>
-                    {/each}                  </div>
-                  {#if selectedSpan}
+                     {#each hx.spans as span}
+                       {@const sp = timelinePct(span.start_time, globalStart, globalEnd)}
+                       {@const ep = timelinePct(span.end_time, globalStart, globalEnd)}
+                       {@const bw = Math.max(0.1, ep - sp)}
+                       {@const barFits = bw > 20}
+                       {@const flip = !barFits && ep > 85}
+                       <div class="span-row" class:selected={selectedSpan && selectedSpan.id === span.id && selectedSpanExecId === exec.workflow_id}>
+                         <div class="span-track">
+                           <div
+                             class="span-bar {spanColor(span.type)}"
+                             style="left: {sp}%; width: {bw}%"
+                             onclick={() => selectSpan(span, exec.workflow_id)}
+                             onkeydown={(e) => { if (e.key === 'Enter') selectSpan(span, exec.workflow_id) }}
+                             role="button"
+                             tabindex="0"
+                             title={spanDisplayName(span, hx) + ': ' + formatDuration(span.start_time, span.end_time)}
+                           >
+                             {#if barFits}
+                               <span class="span-bar-label">{spanDisplayName(span, hx)}</span>
+                             {/if}
+                           </div>
+                           {#if !barFits}
+                             <span class="span-name-label" class:span-name-label--left={flip} style={flip ? `right: ${100 - sp}%` : `left: ${ep}%`}>{spanDisplayName(span, hx)}</span>
+                           {/if}
+                         </div>
+                         <span class="span-duration">{formatDuration(span.start_time, span.end_time)}</span>
+                       </div>
+                     {/each}                  </div>
+                  {#if selectedSpan && selectedSpanExecId === exec.workflow_id}
                     <div class="spans-event-list">
                       <div class="spans-event-list-header">
-                        Events for {selectedSpan.name || selectedSpan.type}
-                        <span class="spans-event-range">({selectedSpan.start_event_id}–{selectedSpan.end_event_id})</span>
+                        Events for {spanDisplayName(selectedSpan, hx)}
+                        <span class="spans-event-range">({selectedSpan.start_event_id}&ndash;{selectedSpan.end_event_id})</span>
                       </div>
                       {#each eventsForSpan(selectedSpan) as event}
                         <div class="timeline-item">
@@ -288,7 +330,7 @@
                   {/if}
                 {:else}
                   <div class="timeline">
-                    {#each history.history as event}
+                    {#each hx.history as event}
                       <div class="timeline-item">
                         <div class="timeline-marker {eventColor(event.event_type)}"></div>
                         <div class="timeline-content" onclick={() => toggleEventDetail(event.event_id)} onkeydown={(e) => { if (e.key === 'Enter') toggleEventDetail(event.event_id) }} role="button" tabindex="0">
@@ -536,7 +578,6 @@
   .event-activity { background: #60a5fa; }
   .event-child { background: #4ade80; }
   .event-timer { background: #9ca3af; }
-  .event-task { background: #6b7280; }
   .event-default { background: #6b7280; }
 
   .timeline-content {
@@ -588,33 +629,6 @@
     font-family: monospace;
     white-space: pre-wrap;
     word-break: break-all;
-  }
-
-  .view-toggle-bar {
-    display: flex;
-    gap: 6px;
-    padding: 8px 16px;
-    border-bottom: 1px solid var(--border);
-  }
-  .view-toggle-btn {
-    background: var(--bg-sidebar);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    color: var(--text-muted);
-    cursor: pointer;
-    font-size: 0.75rem;
-    padding: 5px 14px;
-    transition: background 0.12s, color 0.12s, border-color 0.12s;
-  }
-  .view-toggle-btn:hover {
-    background: rgba(255,255,255,0.05);
-    color: var(--text-base);
-  }
-  .view-toggle-btn.active {
-    background: var(--purple-dim);
-    border-color: oklch(59.1% 0.249 292.7 / 0.35);
-    color: var(--purple);
-    font-weight: 600;
   }
 
   .spans-chart {
@@ -696,7 +710,6 @@
   .span-activity { background: #60a5fa; }
   .span-child { background: #4ade80; }
   .span-timer { background: #9ca3af; }
-  .span-task { background: #6b7280; }
   .span-default { background: #6b7280; }
 
   .spans-event-list {
