@@ -233,12 +233,15 @@
                       <span class="spans-time-label">{spanTime(history.spans[0]?.start_time)}</span>
                       <span class="spans-time-label">{spanTime(history.close_time)}</span>
                     </div>
-                    {#each history.spans as span}
+                     {#each history.spans as span}
+                      {@const sp = timelinePct(span.start_time, globalStart, globalEnd)}
+                      {@const ep = timelinePct(span.end_time, globalStart, globalEnd)}
+                      {@const flip = ep > 85}
                       <div class="span-row" class:selected={selectedSpan && selectedSpan.id === span.id}>
                         <div class="span-track">
                           <div
                             class="span-bar {spanColor(span.type)}"
-                            style="left: {timelinePct(span.start_time, globalStart, globalEnd)}%; width: {Math.max(0.1, timelinePct(span.end_time, globalStart, globalEnd) - timelinePct(span.start_time, globalStart, globalEnd))}%"
+                            style="left: {sp}%; width: {Math.max(0.1, ep - sp)}%"
                             onclick={() => selectSpan(span)}
                             onkeydown={(e) => { if (e.key === 'Enter') selectSpan(span) }}
                             role="button"
@@ -246,12 +249,11 @@
                             title={span.name + ': ' + formatDuration(span.start_time, span.end_time)}
                           >
                           </div>
-                          <span class="span-name-label" style="left: {timelinePct(span.end_time, globalStart, globalEnd)}%">{span.name || span.type}</span>
+                          <span class="span-name-label" class:span-name-label--left={flip} style={flip ? `right: ${100 - sp}%` : `left: ${ep}%`}>{span.name || span.type}</span>
                         </div>
                         <span class="span-duration">{formatDuration(span.start_time, span.end_time)}</span>
                       </div>
-                    {/each}
-                  </div>
+                    {/each}                  </div>
                   {#if selectedSpan}
                     <div class="spans-event-list">
                       <div class="spans-event-list-header">
@@ -639,6 +641,10 @@
     white-space: nowrap;
     pointer-events: none;
     margin-left: 6px;
+  }
+  .span-name-label--left {
+    margin-left: 0;
+    margin-right: 6px;
   }
   .span-track {
     flex: 1;
