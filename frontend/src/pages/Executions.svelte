@@ -235,7 +235,6 @@
                     </div>
                     {#each history.spans as span}
                       <div class="span-row" class:selected={selectedSpan && selectedSpan.id === span.id}>
-                        <span class="span-label" title={span.name}>{span.name || span.type}</span>
                         <div class="span-track">
                           <div
                             class="span-bar {spanColor(span.type)}"
@@ -246,8 +245,8 @@
                             tabindex="0"
                             title={span.name + ': ' + formatDuration(span.start_time, span.end_time)}
                           >
-                            <span class="span-bar-label">{span.name || span.type}</span>
                           </div>
+                          <span class="span-name-label" style="left: {timelinePct(span.end_time, globalStart, globalEnd)}%">{span.name || span.type}</span>
                         </div>
                         <span class="span-duration">{formatDuration(span.start_time, span.end_time)}</span>
                       </div>
@@ -615,7 +614,7 @@
   .spans-time-header {
     display: flex;
     justify-content: space-between;
-    padding: 0 104px 6px 104px;
+    padding: 0 64px 6px 8px;
   }
   .spans-time-label {
     font-size: 0.65rem;
@@ -632,15 +631,14 @@
     background: rgba(255,255,255,0.03);
     border-radius: 4px;
   }
-  .span-label {
-    width: 96px;
-    flex-shrink: 0;
+  .span-name-label {
+    position: absolute;
+    top: 3px;
     font-size: 0.72rem;
     color: var(--text-base);
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    text-align: right;
+    pointer-events: none;
+    margin-left: 6px;
   }
   .span-track {
     flex: 1;
@@ -657,8 +655,6 @@
     border-radius: 3px;
     min-width: 3px;
     cursor: pointer;
-    display: flex;
-    align-items: center;
     transition: opacity 0.1s;
     opacity: 0.8;
   }
