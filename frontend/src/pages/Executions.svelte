@@ -8,6 +8,8 @@
   let historyLoading = $state(false)
   let statusFilter = $state('')
   let expandedEvent = $state(null)
+  let viewMode = $state('events')
+  let selectedSpan = $state(null)
 
   $effect(() => {
     loadExecutions()
@@ -31,11 +33,15 @@
       expandedExec = null
       history = null
       expandedEvent = null
+      viewMode = 'events'
+      selectedSpan = null
       return
     }
     expandedExec = execId
     history = null
     expandedEvent = null
+    viewMode = 'events'
+    selectedSpan = null
     historyLoading = true
     try {
       history = await api.get(`/api/v1/executions/${execId}`)
@@ -96,6 +102,40 @@
 
   function toggleEventDetail(eventId) {
     expandedEvent = expandedEvent === eventId ? null : eventId
+  }
+
+  function spanColor(spanType) {
+    switch (spanType) {
+      case 'activity': return 'span-activity'
+      case 'child_workflow': return 'span-child'
+      case 'timer': return 'span-timer'
+      case 'workflow_task': return 'span-task'
+      default: return 'span-default'
+    }
+  }
+
+  function spanTime(t) {
+    if (!t) return ''
+    const d = new Date(t)
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  }
+
+  function eventsForSpan(span) {
+    if (!history || !span) return []
+    return history.history.filter(e =>
+      e.event_id >= span.start_event_id && e.event_id <= span.end_event_id
+    )
+  }
+
+  function timelinePct(t, globalStart, globalEnd) {
+    const ts = new Date(t).getTime()
+    const total = globalEnd - globalStart
+    if (total <= 0) return 0
+    return ((ts - globalStart) / total) * 100
+  }
+
+  function selectSpan(span) {
+    selectedSpan = selectedSpan && selectedSpan.id === span.id ? null : span
   }
 </script>
 
@@ -178,25 +218,86 @@
                     <span class="detail-value">{formatDuration(history.start_time, history.close_time)}</span>
                   </div>
                 </div>
-                <div class="timeline">
-                  {#each history.history as event}
-                    <div class="timeline-item">
-                      <div class="timeline-marker {eventColor(event.event_type)}"></div>
-                      <div class="timeline-content" onclick={() => toggleEventDetail(event.event_id)} onkeydown={(e) => { if (e.key === 'Enter') toggleEventDetail(event.event_id) }} role="button" tabindex="0">
-                        <div class="timeline-event-header">
-                          <span class="timeline-event-type">{event.event_type}</span>
-                          <span class="timeline-event-time">{formatTime(event.event_time)}</span>
-                        </div>
-                        <span class="timeline-event-summary">{event.summary}</span>
-                        {#if expandedEvent === event.event_id}
-                          <div class="timeline-event-details">
-                            <pre>{JSON.stringify({event_id: event.event_id, event_type: event.event_type, event_time: event.event_time, summary: event.summary, details: event.details}, null, 2)}</pre>
-                          </div>
-                        {/if}
-                      </div>
-                    </div>
-                  {/each}
+                <div class="view-toggle-bar">
+                  <button class="view-toggle-btn" class:active={viewMode === 'events'} onclick={() => { viewMode = 'events'; selectedSpan = null }}>Events</button>
+                  {#if history.spans && history.spans.length > 0}
+                    <button class="view-toggle-btn" class:active={viewMode === 'timeline'} onclick={() => { viewMode = 'timeline'; expandedEvent = null }}>Timeline</button>
+                  {/if}
                 </div>
+                {#if viewMode === 'timeline' && history.spans && history.spans.length > 0}
+                  {@const globalStart = history.spans.length > 0 ? new Date(history.spans[0].start_time).getTime() : 0}
+                  {@const globalEnd = history.close_time ? new Date(history.close_time).getTime() : Date.now()}
+                  <div class="spans-chart">
+                    <div class="spans-time-header">
+                      <span class="spans-time-label">{spanTime(history.spans[0]?.start_time)}</span>
+                      <span class="spans-time-label">{spanTime(history.close_time)}</span>
+                    </div>
+                    {#each history.spans as span}
+                      <div class="span-row" class:selected={selectedSpan && selectedSpan.id === span.id}>
+                        <span class="span-label" title={span.name}>{span.name || span.type}</span>
+                        <div class="span-track">
+                          <div
+                            class="span-bar {spanColor(span.type)}"
+                            style="left: {timelinePct(span.start_time, globalStart, globalEnd)}%; width: {Math.max(1, timelinePct(span.end_time, globalStart, globalEnd) - timelinePct(span.start_time, globalStart, globalEnd))}%"
+                            onclick={() => selectSpan(span)}
+                            onkeydown={(e) => { if (e.key === 'Enter') selectSpan(span) }}
+                            role="button"
+                            tabindex="0"
+                            title={span.name + ': ' + formatDuration(span.start_time, span.end_time)}
+                          >
+                            <span class="span-bar-label">{span.name || span.type}</span>
+                          </div>
+                        </div>
+                        <span class="span-duration">{formatDuration(span.start_time, span.end_time)}</span>
+                      </div>
+                    {/each}
+                  </div>
+                  {#if selectedSpan}
+                    <div class="spans-event-list">
+                      <div class="spans-event-list-header">
+                        Events for {selectedSpan.name || selectedSpan.type}
+                        <span class="spans-event-range">({selectedSpan.start_event_id}–{selectedSpan.end_event_id})</span>
+                      </div>
+                      {#each eventsForSpan(selectedSpan) as event}
+                        <div class="timeline-item">
+                          <div class="timeline-marker {eventColor(event.event_type)}"></div>
+                          <div class="timeline-content" onclick={() => toggleEventDetail(event.event_id)} onkeydown={(e) => { if (e.key === 'Enter') toggleEventDetail(event.event_id) }} role="button" tabindex="0">
+                            <div class="timeline-event-header">
+                              <span class="timeline-event-type">{event.event_type}</span>
+                              <span class="timeline-event-time">{formatTime(event.event_time)}</span>
+                            </div>
+                            <span class="timeline-event-summary">{event.summary}</span>
+                            {#if expandedEvent === event.event_id}
+                              <div class="timeline-event-details">
+                                <pre>{JSON.stringify({event_id: event.event_id, event_type: event.event_type, event_time: event.event_time, summary: event.summary, details: event.details}, null, 2)}</pre>
+                              </div>
+                            {/if}
+                          </div>
+                        </div>
+                      {/each}
+                    </div>
+                  {/if}
+                {:else}
+                  <div class="timeline">
+                    {#each history.history as event}
+                      <div class="timeline-item">
+                        <div class="timeline-marker {eventColor(event.event_type)}"></div>
+                        <div class="timeline-content" onclick={() => toggleEventDetail(event.event_id)} onkeydown={(e) => { if (e.key === 'Enter') toggleEventDetail(event.event_id) }} role="button" tabindex="0">
+                          <div class="timeline-event-header">
+                            <span class="timeline-event-type">{event.event_type}</span>
+                            <span class="timeline-event-time">{formatTime(event.event_time)}</span>
+                          </div>
+                          <span class="timeline-event-summary">{event.summary}</span>
+                          {#if expandedEvent === event.event_id}
+                            <div class="timeline-event-details">
+                              <pre>{JSON.stringify({event_id: event.event_id, event_type: event.event_type, event_time: event.event_time, summary: event.summary, details: event.details}, null, 2)}</pre>
+                            </div>
+                          {/if}
+                        </div>
+                      </div>
+                    {/each}
+                  </div>
+                {/if}
               {:else}
                 <p style="color:var(--text-muted); padding:16px;">Failed to load execution history.</p>
               {/if}
@@ -478,5 +579,139 @@
     font-family: monospace;
     white-space: pre-wrap;
     word-break: break-all;
+  }
+
+  .view-toggle-bar {
+    display: flex;
+    gap: 6px;
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .view-toggle-btn {
+    background: var(--bg-sidebar);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 0.75rem;
+    padding: 5px 14px;
+    transition: background 0.12s, color 0.12s, border-color 0.12s;
+  }
+  .view-toggle-btn:hover {
+    background: rgba(255,255,255,0.05);
+    color: var(--text-base);
+  }
+  .view-toggle-btn.active {
+    background: var(--purple-dim);
+    border-color: oklch(59.1% 0.249 292.7 / 0.35);
+    color: var(--purple);
+    font-weight: 600;
+  }
+
+  .spans-chart {
+    padding: 16px 16px 20px;
+  }
+  .spans-time-header {
+    display: flex;
+    justify-content: space-between;
+    padding: 0 104px 6px 104px;
+  }
+  .spans-time-label {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    font-family: monospace;
+  }
+  .span-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 3px 0;
+  }
+  .span-row.selected {
+    background: rgba(255,255,255,0.03);
+    border-radius: 4px;
+  }
+  .span-label {
+    width: 96px;
+    flex-shrink: 0;
+    font-size: 0.72rem;
+    color: var(--text-base);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: right;
+  }
+  .span-track {
+    flex: 1;
+    height: 22px;
+    position: relative;
+    background: var(--bg-sidebar);
+    border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+  .span-bar {
+    position: absolute;
+    top: 3px;
+    height: 14px;
+    border-radius: 3px;
+    min-width: 3px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    transition: opacity 0.1s;
+    opacity: 0.8;
+  }
+  .span-bar:hover {
+    opacity: 1;
+  }
+  .span-bar-label {
+    font-size: 0.6rem;
+    color: #fff;
+    padding: 0 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+  }
+  .span-duration {
+    width: 56px;
+    flex-shrink: 0;
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    font-family: monospace;
+  }
+  .span-activity { background: #60a5fa; }
+  .span-child { background: #4ade80; }
+  .span-timer { background: #9ca3af; }
+  .span-task { background: #6b7280; }
+  .span-default { background: #6b7280; }
+
+  .spans-event-list {
+    margin-top: 8px;
+    border-top: 1px solid var(--border);
+    padding: 12px 16px 12px 32px;
+    position: relative;
+  }
+  .spans-event-list::before {
+    content: '';
+    position: absolute;
+    left: 26px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--border);
+  }
+  .spans-event-list-header {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-base);
+    padding-bottom: 10px;
+  }
+  .spans-event-range {
+    font-size: 0.68rem;
+    font-weight: 400;
+    color: var(--text-muted);
+    font-family: monospace;
+    margin-left: 6px;
   }
 </style>
