@@ -236,20 +236,27 @@
                      {#each history.spans as span}
                       {@const sp = timelinePct(span.start_time, globalStart, globalEnd)}
                       {@const ep = timelinePct(span.end_time, globalStart, globalEnd)}
-                      {@const flip = ep > 85}
+                      {@const bw = Math.max(0.1, ep - sp)}
+                      {@const barFits = bw > 20}
+                      {@const flip = !barFits && ep > 85}
                       <div class="span-row" class:selected={selectedSpan && selectedSpan.id === span.id}>
                         <div class="span-track">
                           <div
                             class="span-bar {spanColor(span.type)}"
-                            style="left: {sp}%; width: {Math.max(0.1, ep - sp)}%"
+                            style="left: {sp}%; width: {bw}%"
                             onclick={() => selectSpan(span)}
                             onkeydown={(e) => { if (e.key === 'Enter') selectSpan(span) }}
                             role="button"
                             tabindex="0"
                             title={span.name + ': ' + formatDuration(span.start_time, span.end_time)}
                           >
+                            {#if barFits}
+                              <span class="span-bar-label">{span.name || span.type}</span>
+                            {/if}
                           </div>
-                          <span class="span-name-label" class:span-name-label--left={flip} style={flip ? `right: ${100 - sp}%` : `left: ${ep}%`}>{span.name || span.type}</span>
+                          {#if !barFits}
+                            <span class="span-name-label" class:span-name-label--left={flip} style={flip ? `right: ${100 - sp}%` : `left: ${ep}%`}>{span.name || span.type}</span>
+                          {/if}
                         </div>
                         <span class="span-duration">{formatDuration(span.start_time, span.end_time)}</span>
                       </div>
@@ -661,6 +668,9 @@
     border-radius: 3px;
     min-width: 3px;
     cursor: pointer;
+    display: flex;
+    align-items: center;
+    overflow: hidden;
     transition: opacity 0.1s;
     opacity: 0.8;
   }
