@@ -57,7 +57,7 @@
       const full = await api.get('/api/v1/chat/sessions/' + session.id)
       messages = full.messages || []
       if (full.active_run_id) {
-        startStream(full.active_run_id)
+        startStream()
       }
     } catch (e) {
       console.error('Failed to load session', e)
@@ -85,20 +85,20 @@
 
     try {
       const result = await api.post('/api/v1/chat/sessions/' + currentSession.id + '/messages', { message: content })
-      startStream(result.run_id)
+      startStream()
     } catch (e) {
       console.error('Failed to send message', e)
     }
   }
 
-  function startStream(runId) {
+  function startStream() {
     eventSource?.close()
-    activeRunId = runId
+    activeRunId = ''
     streamingContent = ''
     streamingStatus = 'Thinking'
     streamBubbles = []
 
-    const es = new EventSource('/chat/runs/' + runId + '/events')
+    const es = new EventSource('/api/v1/chat/sessions/' + currentSession.id + '/stream')
     eventSource = es
 
     es.addEventListener('response_start', () => {
