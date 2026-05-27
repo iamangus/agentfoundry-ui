@@ -63,8 +63,9 @@
     const s = new Date(start).getTime()
     const e = end ? new Date(end).getTime() : Date.now()
     const ms = e - s
-    if (ms < 1000) return '<1s'
-    if (ms < 60000) return Math.round(ms / 1000) + 's'
+    if (ms < 1) return '0ms'
+    if (ms < 1000) return Math.round(ms) + 'ms'
+    if (ms < 60000) return (ms / 1000).toFixed(1) + 's'
     if (ms < 3600000) return Math.floor(ms / 60000) + 'm ' + Math.round((ms % 60000) / 1000) + 's'
     return Math.floor(ms / 3600000) + 'h ' + Math.floor((ms % 3600000) / 60000) + 'm'
   }
@@ -116,8 +117,8 @@
 
   function spanTime(t) {
     if (!t) return ''
-    const d = new Date(t)
-    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    const iso = new Date(t).toISOString()
+    return iso.substring(11, 23)
   }
 
   function eventsForSpan(span) {
@@ -238,7 +239,7 @@
                         <div class="span-track">
                           <div
                             class="span-bar {spanColor(span.type)}"
-                            style="left: {timelinePct(span.start_time, globalStart, globalEnd)}%; width: {Math.max(1, timelinePct(span.end_time, globalStart, globalEnd) - timelinePct(span.start_time, globalStart, globalEnd))}%"
+                            style="left: {timelinePct(span.start_time, globalStart, globalEnd)}%; width: {Math.max(0.1, timelinePct(span.end_time, globalStart, globalEnd) - timelinePct(span.start_time, globalStart, globalEnd))}%"
                             onclick={() => selectSpan(span)}
                             onkeydown={(e) => { if (e.key === 'Enter') selectSpan(span) }}
                             role="button"
