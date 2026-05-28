@@ -492,6 +492,7 @@
     align-items: center;
     gap: 12px;
     flex-shrink: 0;
+    flex-wrap: nowrap;
   }
 
   .status-badge {
@@ -508,11 +509,19 @@
   .execution-time {
     font-size: 0.72rem;
     color: var(--text-muted);
+    width: 164px;
+    flex-shrink: 0;
+    text-align: right;
+    white-space: nowrap;
   }
   .execution-duration {
     font-size: 0.72rem;
     color: var(--text-muted);
     font-family: monospace;
+    width: 72px;
+    flex-shrink: 0;
+    text-align: right;
+    white-space: nowrap;
   }
   .expand-arrow {
     font-size: 0.8rem;
