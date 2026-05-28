@@ -115,12 +115,8 @@
     return status || 'Unknown'
   }
 
-  function eventColor(eventType) {
-    if (eventType.startsWith('WorkflowExecution')) return 'event-workflow'
-    if (eventType.startsWith('ActivityTask')) return 'event-activity'
-    if (eventType.startsWith('ChildWorkflow') || eventType.startsWith('StartChildWorkflow')) return 'event-child'
-    if (eventType.startsWith('Timer')) return 'event-timer'
-    return 'event-default'
+  function eventColor() {
+    return 'event-workflow'
   }
 
   function toggleEventDetail(eventId) {
@@ -658,6 +654,7 @@
     position: absolute;
     top: 3px;
     font-size: 0.72rem;
+    font-weight: 600;
     color: var(--text-base);
     white-space: nowrap;
     pointer-events: none;
@@ -692,7 +689,8 @@
     opacity: 1;
   }
   .span-bar-label {
-    font-size: 0.6rem;
+    font-size: 0.72rem;
+    font-weight: 600;
     color: #fff;
     padding: 0 4px;
     white-space: nowrap;
