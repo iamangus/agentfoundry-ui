@@ -9,6 +9,7 @@
   let expandedEvent = $state(null)
   let selectedSpan = $state(null)
   let selectedSpanExecId = $state(null)
+  let now = $state(Date.now())
 
   $effect(() => {
     loadExecutions()
@@ -16,6 +17,11 @@
       loadExecutions(true)
       refreshExpandedHistories()
     }, 1000)
+    return () => clearInterval(interval)
+  })
+
+  $effect(() => {
+    const interval = setInterval(() => now = Date.now(), 50)
     return () => clearInterval(interval)
   })
 
@@ -81,10 +87,10 @@
     return d.toLocaleString()
   }
 
-  function formatDuration(start, end) {
+  function formatDuration(start, end, now) {
     if (!start) return '\u2014'
     const s = new Date(start).getTime()
-    const e = end ? new Date(end).getTime() : Date.now()
+    const e = end ? new Date(end).getTime() : now
     const ms = e - s
     if (ms < 1) return '0ms'
     if (ms < 1000) return Math.round(ms) + 'ms'
@@ -229,7 +235,7 @@
             <div class="execution-card-meta">
               <span class="status-badge {statusClass(exec.status)}">{statusLabel(exec.status)}</span>
               <span class="execution-time">{formatTime(exec.start_time)}</span>
-              <span class="execution-duration">{formatDuration(exec.start_time, exec.close_time)}</span>
+              <span class="execution-duration">{formatDuration(exec.start_time, exec.close_time, now)}</span>
               <span class="expand-arrow">{expandedExecs.has(exec.workflow_id) ? '\u25BE' : '\u25B8'}</span>
             </div>
           </div>
@@ -262,16 +268,16 @@
                   </div>
                   <div class="detail-row">
                     <span class="detail-label">Duration</span>
-                    <span class="detail-value">{formatDuration(hx.start_time, hx.close_time)}</span>
+                    <span class="detail-value">{formatDuration(hx.start_time, hx.close_time, now)}</span>
                   </div>
                 </div>
                 {#if hx.spans && hx.spans.length > 0}
                   {@const globalStart = new Date(hx.spans[0].start_time).getTime()}
-                  {@const globalEnd = hx.close_time ? new Date(hx.close_time).getTime() : Date.now()}
+                  {@const globalEnd = hx.close_time ? new Date(hx.close_time).getTime() : now}
                   <div class="spans-chart">
                     <div class="spans-time-header">
                       <span class="spans-time-label">{spanTime(hx.spans[0]?.start_time)}</span>
-                      <span class="spans-time-label">{spanTime(hx.close_time || new Date().toISOString())}</span>
+                      <span class="spans-time-label">{spanTime(hx.close_time || new Date(now).toISOString())}</span>
                     </div>
                      {#each hx.spans as span}
                        {@const sp = timelinePct(span.start_time, globalStart, globalEnd)}
@@ -288,7 +294,7 @@
                              onkeydown={(e) => { if (e.key === 'Enter') selectSpan(span, exec.workflow_id) }}
                              role="button"
                              tabindex="0"
-                             title={spanDisplayName(span, hx) + ': ' + formatDuration(span.start_time, span.end_time)}
+                             title={spanDisplayName(span, hx) + ': ' + formatDuration(span.start_time, span.end_time, now)}
                            >
                              {#if barFits}
                                <span class="span-bar-label">{spanDisplayName(span, hx)}</span>
@@ -298,7 +304,7 @@
                              <span class="span-name-label" class:span-name-label--left={flip} style={flip ? `right: ${100 - sp}%` : `left: ${ep}%`}>{spanDisplayName(span, hx)}</span>
                            {/if}
                          </div>
-                         <span class="span-duration">{formatDuration(span.start_time, span.end_time)}</span>
+                         <span class="span-duration">{formatDuration(span.start_time, span.end_time, now)}</span>
                        </div>
                      {/each}                  </div>
                   {#if selectedSpan && selectedSpanExecId === exec.workflow_id}
