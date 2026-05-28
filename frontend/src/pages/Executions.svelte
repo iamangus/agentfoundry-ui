@@ -705,10 +705,7 @@
     color: var(--text-muted);
     font-family: monospace;
   }
-  .span-activity { background: #60a5fa; }
-  .span-child { background: #4ade80; }
-  .span-timer { background: #9ca3af; }
-  .span-default { background: #6b7280; }
+  .span-activity, .span-child, .span-timer, .span-default { background: var(--purple); }
 
   .spans-event-list {
     margin-top: 8px;
