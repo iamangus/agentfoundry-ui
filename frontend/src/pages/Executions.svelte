@@ -141,12 +141,14 @@
   function eventsForSpan(span) {
     const hx = selectedSpanExecId ? histories[selectedSpanExecId]?.data : null
     if (!hx || !span) return []
+    const endId = span.end_event_id || (hx.history.length > 0 ? hx.history[hx.history.length - 1].event_id : span.start_event_id)
     return hx.history.filter(e =>
-      e.event_id >= span.start_event_id && e.event_id <= span.end_event_id
+      e.event_id >= span.start_event_id && e.event_id <= endId
     )
   }
 
   function timelinePct(t, globalStart, globalEnd) {
+    if (!t) return 100
     const ts = new Date(t).getTime()
     const total = globalEnd - globalStart
     if (total <= 0) return 0
@@ -269,7 +271,7 @@
                   <div class="spans-chart">
                     <div class="spans-time-header">
                       <span class="spans-time-label">{spanTime(hx.spans[0]?.start_time)}</span>
-                      <span class="spans-time-label">{spanTime(hx.close_time)}</span>
+                      <span class="spans-time-label">{spanTime(hx.close_time || new Date().toISOString())}</span>
                     </div>
                      {#each hx.spans as span}
                        {@const sp = timelinePct(span.start_time, globalStart, globalEnd)}
