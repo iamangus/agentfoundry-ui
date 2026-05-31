@@ -454,11 +454,11 @@ func (m *Manager) Middleware(next http.Handler) http.Handler {
 			return
 		}
 
-		m.mu.RLock()
+		m.mu.Lock()
 		sd, ok := m.sessions[cookie.Value]
-		m.mu.RUnlock()
 
 		if !ok {
+			m.mu.Unlock()
 			clearCookie()
 			if isAPIRequest(r) {
 				writeUnauthorized(w)
@@ -473,16 +473,13 @@ func (m *Manager) Middleware(next http.Handler) http.Handler {
 				newSD, err := m.RefreshAccessToken(r.Context(), sd.RefreshToken)
 				if err == nil {
 					newSD.UserInfo = sd.UserInfo
-					m.mu.Lock()
 					m.sessions[cookie.Value] = newSD
-					m.mu.Unlock()
 					sd = newSD
 				}
 			}
 		}
 
 		if time.Now().After(sd.ExpiresAt) {
-			m.mu.Lock()
 			delete(m.sessions, cookie.Value)
 			m.mu.Unlock()
 			clearCookie()
@@ -493,6 +490,7 @@ func (m *Manager) Middleware(next http.Handler) http.Handler {
 			}
 			return
 		}
+		m.mu.Unlock()
 
 		ctx := ContextWithUserInfo(r.Context(), &sd.UserInfo)
 		ctx = ContextWithAccessToken(ctx, sd.AccessToken)
