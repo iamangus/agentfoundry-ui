@@ -513,8 +513,11 @@ func definitionFromJSON(r *http.Request) (*api.Definition, error) {
 		ForceJSON          bool                  `json:"force_json"`
 		Scope              string                `json:"scope"`
 		Team               string                `json:"team"`
-		ProviderID         string                `json:"provider_id"`
-		StructuredOutput   *api.StructuredOutput `json:"structured_output"`
+		ProviderID           string                `json:"provider_id"`
+		StructuredOutput     *api.StructuredOutput `json:"structured_output"`
+		MemoryEnabled        bool                  `json:"memory_enabled"`
+		MemorySearchAgentID  string                `json:"memory_search_agent_id"`
+		MemoryIngestAgentID  string                `json:"memory_ingest_agent_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&formData); err != nil {
 		return nil, fmt.Errorf("invalid JSON: %w", err)
@@ -532,8 +535,11 @@ func definitionFromJSON(r *http.Request) (*api.Definition, error) {
 		ForceJSON:          formData.ForceJSON,
 		Scope:              formData.Scope,
 		Team:               formData.Team,
-		ProviderID:         formData.ProviderID,
-		StructuredOutput:   formData.StructuredOutput,
+		ProviderID:           formData.ProviderID,
+		StructuredOutput:     formData.StructuredOutput,
+		MemoryEnabled:        formData.MemoryEnabled,
+		MemorySearchAgentID:  formData.MemorySearchAgentID,
+		MemoryIngestAgentID:  formData.MemoryIngestAgentID,
 	}
 	return def, nil
 }

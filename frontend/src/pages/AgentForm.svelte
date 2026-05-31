@@ -21,6 +21,9 @@
   let availableProviders = $state([])
   let loading = $state(true)
   let providerID = $state(def.provider_id || '')
+  let memoryEnabled = $state(def.memory_enabled || false)
+  let memorySearchAgentID = $state(def.memory_search_agent_id || '')
+  let memoryIngestAgentID = $state(def.memory_ingest_agent_id || '')
   let enabledTools = $state({})
   let selectedServers = $state([])
   let expandedServer = $state(null)
@@ -196,6 +199,9 @@
       scope,
       team,
       structured_output: so,
+      memory_enabled: memoryEnabled,
+      memory_search_agent_id: memorySearchAgentID,
+      memory_ingest_agent_id: memoryIngestAgentID,
       kind: 'agent',
     })
   }
@@ -437,6 +443,25 @@
       </label>
       {#if soEnabled}
         <textarea value={soJSON} oninput={(e) => soJSON = e.target.value} class="sb-input form-textarea mono" placeholder='"name": "", "schema": null, "strict": false' rows="8" style="margin-top:8px;"></textarea>
+      {/if}
+    </div>
+
+    <div class="form-group">
+      <label class="form-check">
+        <input checked={memoryEnabled} onchange={(e) => memoryEnabled = e.target.checked} type="checkbox" />
+        Enable Memory (Graphiti)
+      </label>
+      {#if memoryEnabled}
+        <div style="margin-top:10px; display:flex; flex-direction:column; gap:10px;">
+          <div>
+            <label class="form-label" style="margin-bottom:4px;">Memory Search Agent ID</label>
+            <input value={memorySearchAgentID} oninput={(e) => memorySearchAgentID = e.target.value} class="sb-input" placeholder="UUID of the memory search agent" />
+          </div>
+          <div>
+            <label class="form-label" style="margin-bottom:4px;">Memory Ingest Agent ID</label>
+            <input value={memoryIngestAgentID} oninput={(e) => memoryIngestAgentID = e.target.value} class="sb-input" placeholder="UUID of the memory ingest agent" />
+          </div>
+        </div>
       {/if}
     </div>
   </div>

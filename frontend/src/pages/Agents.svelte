@@ -43,7 +43,7 @@
   }
 
   function startCreate() {
-    editingAgent = { kind: 'agent', name: '', description: '', model: '', system_prompt: '', tools: [], max_turns: 0, max_concurrent_tools: 0, force_json: false, scope: '', team: '', structured_output: null }
+    editingAgent = { kind: 'agent', name: '', description: '', model: '', system_prompt: '', tools: [], max_turns: 0, max_concurrent_tools: 0, force_json: false, scope: '', team: '', structured_output: null, memory_enabled: false, memory_search_agent_id: '', memory_ingest_agent_id: '' }
     creatingNew = true
   }
 

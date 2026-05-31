@@ -34,6 +34,9 @@ type Definition struct {
 	Scope              string            `json:"scope,omitempty"`
 	Team               string            `json:"team,omitempty"`
 	CreatedBy          string            `json:"created_by,omitempty"`
+	MemoryEnabled        bool   `json:"memory_enabled,omitempty"`
+	MemorySearchAgentID  string `json:"memory_search_agent_id,omitempty"`
+	MemoryIngestAgentID  string `json:"memory_ingest_agent_id,omitempty"`
 }
 
 type StructuredOutput struct {
