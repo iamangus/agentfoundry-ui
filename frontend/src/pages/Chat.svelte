@@ -15,7 +15,6 @@
 
   let streamBubbles = $state([])
   let streamingRaw = ''
-  let streamParsePending = false
   let streamingStatus = $state('')
   let activeRunId = $state('')
   let eventSource = $state(null)
@@ -103,7 +102,6 @@
     streamingStatus = 'Thinking'
     streamBubbles = []
     streamingRaw = ''
-    streamParsePending = false
 
     const es = new EventSource('/chat/runs/' + runId + '/events')
     eventSource = es
@@ -120,13 +118,7 @@
       if (streamBubbles.length === 0) {
         streamBubbles = ['']
       }
-      if (streamParsePending === false) {
-        streamParsePending = true
-        requestAnimationFrame(() => {
-          streamBubbles[streamBubbles.length - 1] = marked.parse(streamingRaw)
-          streamParsePending = false
-        })
-      }
+      streamBubbles[streamBubbles.length - 1] = marked.parse(streamingRaw)
       scrollDown()
     })
 
@@ -150,7 +142,6 @@
         streamingStatus = ''
         streamBubbles = []
         streamingRaw = ''
-        streamParsePending = false
       }
       activeRunId = ''
     })
@@ -158,7 +149,6 @@
     es.onerror = () => {
       es.close()
       eventSource = null
-      streamParsePending = false
       activeRunId = ''
     }
   }
@@ -173,7 +163,6 @@
     }
     streamBubbles = []
     streamingRaw = ''
-    streamParsePending = false
     activeRunId = ''
     requestAnimationFrame(() => scrollDown())
   }
