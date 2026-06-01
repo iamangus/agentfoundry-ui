@@ -107,6 +107,7 @@
     eventSource = es
 
     es.addEventListener('response_start', () => {
+      console.log('[stream] response_start')
       streamingStatus = ''
       streamingRaw = ''
       streamBubbles = [...streamBubbles, '']
@@ -118,15 +119,24 @@
       if (streamBubbles.length === 0) {
         streamBubbles = ['']
       }
-      streamBubbles[streamBubbles.length - 1] = marked.parse(streamingRaw)
+      try {
+        const html = marked.parse(streamingRaw)
+        console.log('[stream] token:', JSON.stringify(e.data), '| raw:', streamingRaw.length, 'chars | html:', html.length, 'chars | bubble:', streamBubbles.length)
+        streamBubbles[streamBubbles.length - 1] = html
+      } catch (err) {
+        console.error('[stream] marked.parse threw:', err)
+        streamBubbles[streamBubbles.length - 1] = streamingRaw
+      }
       scrollDown()
     })
 
     es.addEventListener('status', (e) => {
+      console.log('[stream] status:', e.data)
       streamingStatus = e.data
     })
 
     es.addEventListener('done', (e) => {
+      console.log('[stream] done, mdText length:', (e.data || '').length)
       es.close()
       eventSource = null
       finalizeStream(e.data)
