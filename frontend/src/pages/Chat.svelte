@@ -14,7 +14,7 @@
   let messageListEl = $state(null)
 
   let streamBubbles = $state([])
-  let streamingContent = $state('')
+  let streamBubblesHtml = $state([])
   let streamingStatus = $state('')
   let activeRunId = $state('')
   let eventSource = $state(null)
@@ -55,7 +55,12 @@
     navigate('/chat?session=' + session.id)
     try {
       const full = await api.get('/api/v1/chat/sessions/' + session.id)
-      messages = full.messages || []
+      messages = (full.messages || []).map(msg => {
+        if (msg.role === 'assistant') {
+          return { ...msg, content: marked.parse(msg.content) }
+        }
+        return msg
+      })
       if (full.active_run_id) {
         startStream(full.active_run_id)
       }
@@ -94,9 +99,9 @@
   function startStream(runId) {
     eventSource?.close()
     activeRunId = runId
-    streamingContent = ''
     streamingStatus = 'Thinking'
     streamBubbles = []
+    streamBubblesHtml = []
 
     const es = new EventSource('/chat/runs/' + runId + '/events')
     eventSource = es
@@ -104,14 +109,18 @@
     es.addEventListener('response_start', () => {
       streamingStatus = ''
       streamBubbles = [...streamBubbles, '']
+      streamBubblesHtml = [...streamBubblesHtml, '']
     })
 
     es.addEventListener('token', (e) => {
       streamingStatus = ''
       if (streamBubbles.length === 0) {
         streamBubbles = ['']
+        streamBubblesHtml = ['']
       }
-      streamBubbles[streamBubbles.length - 1] += e.data
+      const i = streamBubbles.length - 1
+      streamBubbles[i] += e.data
+      streamBubblesHtml[i] = marked.parse(streamBubbles[i])
       scrollDown()
     })
 
@@ -134,6 +143,7 @@
       } else {
         streamingStatus = ''
         streamBubbles = []
+        streamBubblesHtml = []
       }
       activeRunId = ''
     })
@@ -147,14 +157,15 @@
 
   function finalizeStream(mdText) {
     streamingStatus = ''
-    let html = marked.parse(mdText || '')
     if (streamBubbles.length > 0) {
-      streamBubbles[streamBubbles.length - 1] = html
-      for (let i = 0; i < streamBubbles.length; i++) {
-        messages = [...messages, { role: 'assistant', content: streamBubbles[i] }]
+      const html = marked.parse(mdText || '')
+      streamBubblesHtml[streamBubblesHtml.length - 1] = html
+      for (let i = 0; i < streamBubblesHtml.length; i++) {
+        messages = [...messages, { role: 'assistant', content: streamBubblesHtml[i] }]
       }
     }
     streamBubbles = []
+    streamBubblesHtml = []
     activeRunId = ''
     requestAnimationFrame(() => scrollDown())
   }
@@ -250,7 +261,7 @@
           </div>
         {/each}
 
-        {#each streamBubbles as content}
+        {#each streamBubblesHtml as content}
           <div class="msg-row msg-left">
             <div class="bubble bubble-bot">
               {@html content || ''}
