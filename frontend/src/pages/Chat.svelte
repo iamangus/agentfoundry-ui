@@ -61,6 +61,7 @@
         }
         return msg
       })
+      requestAnimationFrame(() => scrollDown())
       if (full.active_run_id) {
         startStream(full.active_run_id)
       }
@@ -108,9 +109,16 @@
 
     es.addEventListener('response_start', () => {
       console.log('[stream] response_start')
+      if (streamBubbles.length > 0) {
+        for (const bubble of streamBubbles) {
+          if (bubble && bubble.trim()) {
+            messages = [...messages, { role: 'assistant', content: bubble }]
+          }
+        }
+      }
       streamingStatus = ''
       streamingRaw = ''
-      streamBubbles = [...streamBubbles, '']
+      streamBubbles = ['']
     })
 
     es.addEventListener('token', (e) => {
@@ -179,10 +187,7 @@
 
   function scrollDown() {
     if (!messageListEl) return
-    const nearBottom = messageListEl.scrollHeight - messageListEl.scrollTop - messageListEl.clientHeight < 50
-    if (nearBottom) {
-      messageListEl.scrollTop = messageListEl.scrollHeight
-    }
+    messageListEl.scrollTop = messageListEl.scrollHeight
   }
 
   function handleKeydown(e) {
