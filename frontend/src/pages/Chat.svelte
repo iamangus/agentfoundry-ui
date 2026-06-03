@@ -404,7 +404,7 @@
 
   .chat-body {
     flex: 1; overflow-y: auto; padding: 28px 24px;
-    display: flex; flex-direction: column; gap: 16px;
+    display: flex; flex-direction: column; gap: 4px;
   }
 
   .chat-foot {
