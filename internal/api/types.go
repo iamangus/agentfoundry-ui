@@ -37,6 +37,7 @@ type Definition struct {
 	MemoryEnabled        bool   `json:"memory_enabled,omitempty"`
 	MemorySearchAgentID  string `json:"memory_search_agent_id,omitempty"`
 	MemoryIngestAgentID  string `json:"memory_ingest_agent_id,omitempty"`
+	ToolOverrides        json.RawMessage `json:"tool_overrides,omitempty"`
 }
 
 type StructuredOutput struct {

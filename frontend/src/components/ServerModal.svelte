@@ -14,6 +14,7 @@
   let formHeaders = $state('')
   let formScope = $state('user')
   let formTeam = $state('')
+  let toolOverrides = $state({})
 
   $effect(() => {
     loadTeams()
@@ -24,6 +25,11 @@
       formHeaders = server.headers ? Object.entries(server.headers).map(([k, v]) => `${k}: ${v}`).join('\n') : ''
       formScope = server.scope || 'user'
       formTeam = server.team || ''
+      if (server.tool_overrides) {
+        try {
+          toolOverrides = typeof server.tool_overrides === 'string' ? JSON.parse(server.tool_overrides) : server.tool_overrides
+        } catch {}
+      }
     }
   })
 
@@ -50,6 +56,70 @@
     return headers
   }
 
+  function getOverrideKeys() {
+    return Object.keys(toolOverrides)
+  }
+
+  function getOverrideParams(key) {
+    return toolOverrides[key] ? Object.keys(toolOverrides[key]) : []
+  }
+
+  function addOverride(target) {
+    const ov = { ...toolOverrides }
+    if (!ov[target]) ov[target] = {}
+    ov[target] = { ...ov[target] }
+    ov[target][''] = { value: '', force: false }
+    toolOverrides = ov
+  }
+
+  function removeOverride(target, param) {
+    const ov = { ...toolOverrides }
+    if (ov[target]) {
+      ov[target] = { ...ov[target] }
+      delete ov[target][param]
+      if (Object.keys(ov[target]).length === 0) delete ov[target]
+    }
+    toolOverrides = ov
+  }
+
+  function updateOverrideParam(target, oldParam, newParam) {
+    const ov = { ...toolOverrides }
+    if (ov[target] && ov[target][oldParam] && newParam !== oldParam) {
+      ov[target] = { ...ov[target] }
+      ov[target][newParam] = ov[target][oldParam]
+      delete ov[target][oldParam]
+      toolOverrides = ov
+    }
+  }
+
+  function updateOverrideValue(target, param, val) {
+    const ov = { ...toolOverrides }
+    if (!ov[target]) ov[target] = {}
+    ov[target] = { ...ov[target] }
+    ov[target][param] = { ...(ov[target][param] || {}), value: val }
+    toolOverrides = ov
+  }
+
+  function updateOverrideForce(target, param, force) {
+    const ov = { ...toolOverrides }
+    if (!ov[target]) ov[target] = {}
+    ov[target] = { ...ov[target] }
+    ov[target][param] = { ...(ov[target][param] || {}), force }
+    toolOverrides = ov
+  }
+
+  function buildBody() {
+    return {
+      name: formName.trim(),
+      url: formUrl.trim(),
+      transport: formTransport,
+      headers: parseHeaders(),
+      scope: formScope,
+      team: formScope === 'team' ? formTeam.trim() : '',
+      tool_overrides: JSON.stringify(toolOverrides)
+    }
+  }
+
   async function save() {
     if (!formName.trim() || !formUrl.trim()) {
       error = 'Name and URL are required'
@@ -58,15 +128,7 @@
     saving = true
     error = ''
     try {
-      const body = {
-        name: formName.trim(),
-        url: formUrl.trim(),
-        transport: formTransport,
-        headers: parseHeaders(),
-        scope: formScope,
-        team: formScope === 'team' ? formTeam.trim() : ''
-      }
-      await api.post('/tools/servers', body)
+      await api.post('/tools/servers', buildBody())
       oncreated()
     } catch (e) {
       error = e.message || 'Failed to save'
@@ -83,15 +145,7 @@
     saving = true
     error = ''
     try {
-      const body = {
-        name: formName.trim(),
-        url: formUrl.trim(),
-        transport: formTransport,
-        headers: parseHeaders(),
-        scope: formScope,
-        team: formScope === 'team' ? formTeam.trim() : ''
-      }
-      await api.put('/tools/servers/' + server.id, body)
+      await api.put('/tools/servers/' + server.id, buildBody())
       oncreated()
     } catch (e) {
       error = e.message || 'Failed to update'
@@ -142,6 +196,30 @@
         {/each}
       </select>
     {/if}
+
+    <label class="modal-label">Tool Parameter Overrides</label>
+    <p class="modal-hint">Override input values for tool parameters. Use <code>*</code> to target all tools, or a specific tool name. Value supports <code>$&#123;agentID&#125;</code>, <code>$&#123;agentName&#125;</code>, <code>$&#123;userSubject&#125;</code>.</p>
+    {#each getOverrideKeys() as target}
+      <div class="override-group">
+        <div class="override-group-header">
+          <span class="override-target-name">{target}</span>
+          <button class="override-rm-group-btn" onclick={() => { const ov = { ...toolOverrides }; delete ov[target]; toolOverrides = ov }} title="Remove all for {target}">&times;</button>
+        </div>
+        {#each getOverrideParams(target) as param}
+          <div class="override-row">
+            <input class="sb-input override-param" placeholder="param" value={param} onblur={(e) => updateOverrideParam(target, param, e.target.value.trim())} oninput={null} />
+            <input class="sb-input override-val" placeholder='${agentID}' value={toolOverrides[target][param]?.value || ''} oninput={(e) => updateOverrideValue(target, param, e.target.value)} />
+            <label class="override-force">
+              <input type="checkbox" checked={toolOverrides[target][param]?.force || false} onchange={(e) => updateOverrideForce(target, param, e.target.checked)} />
+              force
+            </label>
+            <button class="override-rm-btn" onclick={() => removeOverride(target, param)} title="Remove">&times;</button>
+          </div>
+        {/each}
+        <button class="override-add-btn" onclick={() => addOverride(target)}>+ Param</button>
+      </div>
+    {/each}
+    <button class="override-add-group-btn" onclick={() => addOverride('*')}>+ Add override group</button>
 
     <div class="modal-actions">
       <button onclick={close} class="modal-btn modal-btn-cancel">Cancel</button>
@@ -234,4 +312,111 @@
   }
   .modal-btn-create:hover { opacity: 0.85; }
   .modal-btn-create:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  .modal-hint {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    margin: 2px 0 8px 0;
+    line-height: 1.4;
+  }
+  .modal-hint code {
+    font-size: 0.68rem;
+    background: rgba(124,58,237,0.12);
+    padding: 1px 4px;
+    border-radius: 3px;
+  }
+  .override-group {
+    background: var(--bg-sidebar);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px;
+    margin-bottom: 8px;
+  }
+  .override-group-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+  }
+  .override-target-name {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--purple-solid);
+    font-family: 'SF Mono', 'Fira Code', monospace;
+  }
+  .override-rm-group-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    cursor: pointer;
+    padding: 0 4px;
+    line-height: 1;
+  }
+  .override-rm-group-btn:hover { color: #ef4444; }
+  .override-row {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    margin-bottom: 4px;
+  }
+  .override-param {
+    width: 100px;
+    font-size: 0.7rem;
+    padding: 2px 5px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+  }
+  .override-val {
+    flex: 1;
+    font-size: 0.7rem;
+    padding: 2px 5px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+  }
+  .override-force {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .override-force input[type="checkbox"] {
+    accent-color: var(--purple-solid);
+  }
+  .override-rm-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    cursor: pointer;
+    padding: 0 4px;
+    line-height: 1;
+  }
+  .override-rm-btn:hover { color: #ef4444; }
+  .override-add-btn {
+    background: var(--bg-card);
+    color: var(--purple-solid);
+    border: 1px solid var(--purple-soft);
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 0.68rem;
+    cursor: pointer;
+    padding: 2px 8px;
+    margin-top: 2px;
+  }
+  .override-add-btn:hover { background: var(--purple-soft); }
+  .override-add-group-btn {
+    background: var(--bg-sidebar);
+    color: var(--text-muted);
+    border: 1px dashed var(--border);
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 0.72rem;
+    cursor: pointer;
+    padding: 6px 12px;
+    width: 100%;
+    margin-bottom: 8px;
+  }
+  .override-add-group-btn:hover { color: var(--text-base); border-color: var(--text-muted); }
 </style>

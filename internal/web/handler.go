@@ -518,6 +518,7 @@ func definitionFromJSON(r *http.Request) (*api.Definition, error) {
 		MemoryEnabled        bool                  `json:"memory_enabled"`
 		MemorySearchAgentID  string                `json:"memory_search_agent_id"`
 		MemoryIngestAgentID  string                `json:"memory_ingest_agent_id"`
+		ToolOverrides        json.RawMessage       `json:"tool_overrides"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&formData); err != nil {
 		return nil, fmt.Errorf("invalid JSON: %w", err)
@@ -540,6 +541,7 @@ func definitionFromJSON(r *http.Request) (*api.Definition, error) {
 		MemoryEnabled:        formData.MemoryEnabled,
 		MemorySearchAgentID:  formData.MemorySearchAgentID,
 		MemoryIngestAgentID:  formData.MemoryIngestAgentID,
+		ToolOverrides:        formData.ToolOverrides,
 	}
 	return def, nil
 }

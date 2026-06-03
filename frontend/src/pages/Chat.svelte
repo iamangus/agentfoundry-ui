@@ -461,16 +461,5 @@
     0%, 80%, 100% { opacity: 0.2; transform: scale(0.85); }
     40%           { opacity: 1;   transform: scale(1.15); }
   }
-  .bubble p { margin: 0 0 0.5em 0; }
-  .bubble p:last-child { margin-bottom: 0; }
-  .bubble h1, .bubble h2, .bubble h3, .bubble h4 { margin: 0 0 0.5em 0; }
-  .bubble ul, .bubble ol { margin: 0 0 0.5em 0; padding-left: 1.5em; }
-  .bubble li { margin-bottom: 0.25em; }
-  .bubble pre { margin: 0 0 0.5em 0; overflow-x: auto; }
-  .bubble code { font-size: 0.9em; }
-  .bubble table { margin: 0 0 0.5em 0; border-collapse: collapse; }
-  .bubble th, .bubble td { border: 1px solid var(--border); padding: 6px 12px; }
-  .bubble blockquote { margin: 0 0 0.5em 0; padding-left: 1em; border-left: 3px solid var(--border); color: var(--text-muted); }
-  .bubble hr { margin: 0.75em 0; border: none; border-top: 1px solid var(--border); }
   .scroll-anchor { overflow-anchor: auto; height: 1px; }
 </style>

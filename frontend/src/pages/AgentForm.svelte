@@ -28,6 +28,7 @@
   let selectedServers = $state([])
   let expandedServer = $state(null)
   let subAgents = $state([])
+  let toolOverrides = $state({})
 
   $effect(() => {
     loadAll()
@@ -71,6 +72,11 @@
     enabledTools = et
     selectedServers = Object.keys(et)
     subAgents = sa
+    if (def.tool_overrides) {
+      try {
+        toolOverrides = typeof def.tool_overrides === 'string' ? JSON.parse(def.tool_overrides) : def.tool_overrides
+      } catch {}
+    }
   }
 
   function addServer(name) {
@@ -162,6 +168,68 @@
     return a?.description || ''
   }
 
+  function getOverrideKey(serverName, toolName) {
+    return serverName + '.' + toolName
+  }
+
+  function getOverrides(serverName, toolName) {
+    const key = getOverrideKey(serverName, toolName)
+    return toolOverrides[key] || {}
+  }
+
+  function addOverride(serverName, toolName) {
+    const key = getOverrideKey(serverName, toolName)
+    const ov = { ...toolOverrides }
+    if (!ov[key]) ov[key] = {}
+    ov[key] = { ...ov[key] }
+    ov[key][''] = { value: '', force: false }
+    toolOverrides = ov
+  }
+
+  function removeOverride(serverName, toolName, param) {
+    const key = getOverrideKey(serverName, toolName)
+    const ov = { ...toolOverrides }
+    if (ov[key]) {
+      ov[key] = { ...ov[key] }
+      delete ov[key][param]
+      if (Object.keys(ov[key]).length === 0) delete ov[key]
+    }
+    toolOverrides = ov
+  }
+
+  function updateOverrideParam(serverName, toolName, oldParam, newParam) {
+    const key = getOverrideKey(serverName, toolName)
+    const ov = { ...toolOverrides }
+    if (ov[key] && ov[key][oldParam] && newParam !== oldParam) {
+      ov[key] = { ...ov[key] }
+      ov[key][newParam] = ov[key][oldParam]
+      delete ov[key][oldParam]
+      toolOverrides = ov
+    }
+  }
+
+  function updateOverrideValue(serverName, toolName, param, val) {
+    const key = getOverrideKey(serverName, toolName)
+    const ov = { ...toolOverrides }
+    if (!ov[key]) ov[key] = {}
+    ov[key] = { ...ov[key] }
+    ov[key][param] = { ...(ov[key][param] || {}), value: val }
+    toolOverrides = ov
+  }
+
+  function updateOverrideForce(serverName, toolName, param, force) {
+    const key = getOverrideKey(serverName, toolName)
+    const ov = { ...toolOverrides }
+    if (!ov[key]) ov[key] = {}
+    ov[key] = { ...ov[key] }
+    ov[key][param] = { ...(ov[key][param] || {}), force }
+    toolOverrides = ov
+  }
+
+  function overrideParamKeys(serverName, toolName) {
+    return Object.keys(getOverrides(serverName, toolName))
+  }
+
   function handleSave() {
     const tools = []
     for (const s of selectedServers) {
@@ -202,6 +270,7 @@
       memory_enabled: memoryEnabled,
       memory_search_agent_id: memorySearchAgentID,
       memory_ingest_agent_id: memoryIngestAgentID,
+      tool_overrides: JSON.stringify(toolOverrides),
       kind: 'agent',
     })
   }
@@ -387,6 +456,40 @@
                         {/each}
                       </div>
                     {/if}
+
+                    <div class="tool-override-section">
+                      <div class="tool-section-label" style="margin-top:12px; margin-bottom:8px;">Param Overrides</div>
+                      {#each tools as tool}
+                        {#if isChecked(srvName, tool.name)}
+                          <div class="tool-override-tool-group">
+                            <span class="tool-override-tool-name">{tool.name}</span>
+                            {#each overrideParamKeys(srvName, tool.name) as param}
+                              <div class="tool-override-row">
+                                <input
+                                  class="sb-input override-param-input"
+                                  placeholder="param name"
+                                  value={param}
+                                  onblur={(e) => updateOverrideParam(srvName, tool.name, param, e.target.value.trim())}
+                                  oninput={null}
+                                />
+                                <input
+                                  class="sb-input override-val-input"
+                                  placeholder='${agentID}'
+                                  value={getOverrides(srvName, tool.name)[param]?.value || ''}
+                                  oninput={(e) => updateOverrideValue(srvName, tool.name, param, e.target.value)}
+                                />
+                                <label class="override-force-label">
+                                  <input type="checkbox" checked={getOverrides(srvName, tool.name)[param]?.force || false} onchange={(e) => updateOverrideForce(srvName, tool.name, param, e.target.checked)} />
+                                  force
+                                </label>
+                                <button class="override-remove-btn" onclick={() => removeOverride(srvName, tool.name, param)} title="Remove">&times;</button>
+                              </div>
+                            {/each}
+                            <button class="override-add-btn" onclick={() => addOverride(srvName, tool.name)}>+ Add override</button>
+                          </div>
+                        {/if}
+                      {/each}
+                    </div>
                   </div>
                 {/if}
               </div>
@@ -779,4 +882,76 @@
   .action-btn:hover { background: var(--border); color: var(--text-base); }
   .action-btn-delete { color: #ef4444; border-color: #ef444440; }
   .action-btn-delete:hover { background: #ef444418; color: #ef4444; }
+
+  .tool-override-section {
+    margin-top: 8px;
+    border-top: 1px solid var(--border);
+    padding-top: 4px;
+  }
+  .tool-override-tool-group {
+    margin-bottom: 10px;
+    padding: 8px;
+    background: var(--bg-sidebar);
+    border-radius: 6px;
+  }
+  .tool-override-tool-name {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    display: block;
+    margin-bottom: 6px;
+  }
+  .tool-override-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    margin-bottom: 4px;
+  }
+  .override-param-input {
+    width: 120px;
+    font-size: 0.72rem;
+    padding: 3px 6px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+  }
+  .override-val-input {
+    flex: 1;
+    font-size: 0.72rem;
+    padding: 3px 6px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+  }
+  .override-force-label {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .override-force-label input[type="checkbox"] {
+    accent-color: var(--purple-solid);
+  }
+  .override-remove-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    cursor: pointer;
+    padding: 0 4px;
+    line-height: 1;
+  }
+  .override-remove-btn:hover { color: #ef4444; }
+  .override-add-btn {
+    background: var(--bg-card);
+    color: var(--purple-solid);
+    border: 1px solid var(--purple-soft);
+    border-radius: 5px;
+    font-family: inherit;
+    font-size: 0.72rem;
+    cursor: pointer;
+    padding: 3px 10px;
+    margin-top: 2px;
+  }
+  .override-add-btn:hover { background: var(--purple-soft); }
 </style>

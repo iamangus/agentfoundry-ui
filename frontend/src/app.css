@@ -99,7 +99,7 @@ html, body {
   word-break: break-word;
   white-space: pre-wrap;
 }
-.bubble p { margin: 0.4em 0; }
+.bubble p { margin: 0 0 0.3em 0; }
 .bubble p:first-child { margin-top: 0; }
 .bubble p:last-child { margin-bottom: 0; }
 .bubble pre {

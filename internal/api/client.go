@@ -52,8 +52,9 @@ type MCPServerInfo struct {
 	CreatedBy string            `json:"created_by"`
 	CreatedAt string            `json:"created_at"`
 	UpdatedAt string            `json:"updated_at"`
-	Connected bool              `json:"connected"`
-	Tools     []MCPServerTool   `json:"tools"`
+	Connected     bool              `json:"connected"`
+	Tools         []MCPServerTool   `json:"tools"`
+	ToolOverrides json.RawMessage   `json:"tool_overrides,omitempty"`
 }
 
 type MCPServerTool struct {
@@ -64,12 +65,13 @@ type MCPServerTool struct {
 }
 
 type CreateMCPServerRequest struct {
-	Name      string            `json:"name"`
-	URL       string            `json:"url"`
-	Transport string            `json:"transport"`
-	Headers   map[string]string `json:"headers,omitempty"`
-	Scope     string            `json:"scope"`
-	Team      string            `json:"team,omitempty"`
+	Name          string            `json:"name"`
+	URL           string            `json:"url"`
+	Transport     string            `json:"transport"`
+	Headers       map[string]string `json:"headers,omitempty"`
+	Scope         string            `json:"scope"`
+	Team          string            `json:"team,omitempty"`
+	ToolOverrides json.RawMessage   `json:"tool_overrides,omitempty"`
 }
 
 type SetToolScopeRequest struct {
