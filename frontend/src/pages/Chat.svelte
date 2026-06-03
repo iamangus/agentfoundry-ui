@@ -2,6 +2,7 @@
   import { api } from '../lib/api.js'
   import { navigate } from '../lib/stores.js'
   import { marked } from 'marked'
+  marked.setOptions({ gfm: true, breaks: true })
 
   let agents = $state([])
   let sessions = $state([])
