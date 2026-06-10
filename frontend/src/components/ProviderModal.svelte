@@ -17,6 +17,9 @@
   let formHeaders = $state('')
   let formScope = $state('user')
   let formTeam = $state('')
+  let formReasoning = $state('')
+  let reasoningExpanded = $state(false)
+  let reasoningPlaceholder = '{"effort":"medium","max_tokens":1024}'
 
   $effect(() => {
     loadTeams()
@@ -30,6 +33,9 @@
       formHeaders = provider.headers ? Object.entries(provider.headers).map(([k, v]) => `${k}: ${v}`).join('\n') : ''
       formScope = provider.scope || 'user'
       formTeam = provider.team || ''
+      if (provider.reasoning) {
+        formReasoning = typeof provider.reasoning === 'string' ? provider.reasoning : JSON.stringify(provider.reasoning, null, 2)
+      }
     }
   })
 
@@ -64,6 +70,10 @@
     saving = true
     error = ''
     try {
+      let reasoning
+      if (formReasoning.trim()) {
+        try { reasoning = JSON.parse(formReasoning) } catch {}
+      }
       const body = {
         name: formName.trim(),
         provider_type: formProviderType,
@@ -72,6 +82,7 @@
         default_model: formDefaultModel.trim(),
         schema_validation: formSchemaValidation,
         headers: parseHeaders(),
+        reasoning,
         scope: formScope,
         team: formScope === 'team' ? formTeam.trim() : ''
       }
@@ -92,6 +103,10 @@
     saving = true
     error = ''
     try {
+      let reasoning
+      if (formReasoning.trim()) {
+        try { reasoning = JSON.parse(formReasoning) } catch {}
+      }
       const body = {
         name: formName.trim(),
         provider_type: formProviderType,
@@ -100,6 +115,7 @@
         default_model: formDefaultModel.trim(),
         schema_validation: formSchemaValidation,
         headers: parseHeaders(),
+        reasoning,
         scope: formScope,
         team: formScope === 'team' ? formTeam.trim() : ''
       }
@@ -165,6 +181,47 @@
           <option value={t}>{t}</option>
         {/each}
       </select>
+    {/if}
+
+    <div class="reasoning-toggle" onclick={() => reasoningExpanded = !reasoningExpanded} onkeydown={(e) => { if (e.key === 'Enter') reasoningExpanded = !reasoningExpanded }} role="button" tabindex="0">
+      <span>OpenRouter Reasoning Settings</span>
+      <span class="reasoning-arrow">{reasoningExpanded ? '▾' : '▸'}</span>
+    </div>
+    {#if reasoningExpanded}
+      <div class="reasoning-body">
+        <label class="modal-label">Effort</label>
+        <select class="sb-input" bind:value={formReasoning.effort} onchange={(e) => {
+          const r = formReasoning ? JSON.parse(formReasoning) : {}
+          r.effort = e.target.value || undefined
+          formReasoning = JSON.stringify(r, null, 2)
+        }}>
+          <option value="auto">Auto</option>
+          <option value="none">None</option>
+          <option value="low">Low</option>
+          <option value="medium">Medium</option>
+          <option value="high">High</option>
+          <option value="xhigh">X-High</option>
+        </select>
+
+        <label class="modal-label">Max Tokens</label>
+        <input type="number" class="sb-input" placeholder="Optional" value={formReasoning ? (JSON.parse(formReasoning).max_tokens ?? '') : ''} oninput={(e) => {
+          const r = formReasoning ? JSON.parse(formReasoning) : {}
+          r.max_tokens = e.target.value ? parseInt(e.target.value) : undefined
+          formReasoning = JSON.stringify(r, null, 2)
+        }} />
+
+        <label class="modal-label" style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+          <input type="checkbox" style="width:14px;height:14px;" checked={formReasoning ? (JSON.parse(formReasoning).exclude || false) : false} onchange={(e) => {
+            const r = formReasoning ? JSON.parse(formReasoning) : {}
+            r.exclude = e.target.checked || undefined
+            formReasoning = JSON.stringify(r, null, 2)
+          }} />
+          Exclude
+        </label>
+
+        <label class="modal-label">Raw JSON</label>
+        <textarea class="sb-input sb-textarea" bind:value={formReasoning} placeholder={reasoningPlaceholder} rows="3"></textarea>
+      </div>
     {/if}
 
     <div class="modal-actions">
@@ -255,4 +312,30 @@
   }
   .modal-btn-create:hover { opacity: 0.85; }
   .modal-btn-create:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  .reasoning-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    margin: 12px 0 0 0;
+    background: var(--bg-sidebar);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: var(--text-base);
+    user-select: none;
+    transition: background 0.12s;
+  }
+  .reasoning-toggle:hover { background: var(--border); }
+  .reasoning-arrow { font-size: 0.7rem; color: var(--text-muted); }
+  .reasoning-body {
+    border: 1px solid var(--border);
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+    padding: 12px 14px;
+    margin-bottom: 4px;
+  }
 </style>

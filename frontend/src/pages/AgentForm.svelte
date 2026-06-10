@@ -21,6 +21,9 @@
   let availableProviders = $state([])
   let loading = $state(true)
   let providerID = $state(def.provider_id || '')
+  let modelCapabilities = $state(null)
+  let modelParams = $state(def.model_params ? (typeof def.model_params === 'string' ? JSON.parse(def.model_params) : def.model_params) : {})
+  let capDebounce = $state(null)
   let memoryEnabled = $state(def.memory_enabled || false)
   let memorySearchAgentID = $state(def.memory_search_agent_id || '')
   let memoryIngestAgentID = $state(def.memory_ingest_agent_id || '')
@@ -117,6 +120,28 @@
   function removeSubAgent(agentName) {
     subAgents = subAgents.filter(a => a !== agentName)
   }
+
+  async function fetchCapabilities() {
+    if (!model || !providerID) {
+      modelCapabilities = null
+      return
+    }
+    try {
+      const resp = await api.get('/api/v1/models/' + encodeURIComponent(model) + '/capabilities?provider_id=' + encodeURIComponent(providerID))
+      modelCapabilities = resp
+    } catch {
+      modelCapabilities = null
+    }
+  }
+
+  $effect(() => {
+    const mdl = model
+    const pid = providerID
+    if (capDebounce) clearTimeout(capDebounce)
+    capDebounce = setTimeout(() => {
+      fetchCapabilities()
+    }, 500)
+  })
 
   function getServer(name) {
     return availableServers.find(s => s.name === name)
@@ -253,6 +278,8 @@
       }
     }
 
+      const mpObj = Object.keys(modelParams).length > 0 ? modelParams : undefined
+
       onsave({
         originalName: def.name,
         name,
@@ -260,6 +287,7 @@
         model,
         provider_id: providerID,
         system_prompt: systemPrompt,
+      model_params: mpObj,
       tools,
       max_turns: maxTurns,
       max_concurrent_tools: maxConcurrentTools,
@@ -310,6 +338,95 @@
         {/each}
       </select>
     </div>
+
+    {#if modelCapabilities && modelCapabilities.supported_parameters && modelCapabilities.supported_parameters.length > 0}
+      <div class="form-group">
+        <label class="form-label">Model Parameters</label>
+        <div class="params-card">
+          {#each modelCapabilities.supported_parameters as param}
+            {#if param === 'reasoning'}
+              <div class="param-group">
+                <span class="param-label">Reasoning Effort</span>
+                <select class="sb-input" value={modelParams.reasoning?.effort || 'auto'} onchange={(e) => {
+                  const mp = { ...modelParams }
+                  if (!mp.reasoning) mp.reasoning = {}
+                  mp.reasoning.effort = e.target.value || undefined
+                  if (!mp.reasoning.effort && !mp.reasoning.max_tokens) delete mp.reasoning
+                  modelParams = mp
+                }}>
+                  <option value="auto">Auto</option>
+                  <option value="none">None</option>
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                  {#if modelCapabilities.default_parameters?.reasoning?.effort === 'xhigh'}
+                    <option value="xhigh">X-High</option>
+                  {/if}
+                </select>
+                <span class="param-label" style="margin-top:8px;">Max Reasoning Tokens</span>
+                <input type="number" class="sb-input" value={modelParams.reasoning?.max_tokens || ''} placeholder="Optional" oninput={(e) => {
+                  const mp = { ...modelParams }
+                  if (!mp.reasoning) mp.reasoning = {}
+                  mp.reasoning.max_tokens = e.target.value ? parseInt(e.target.value) : undefined
+                  if (!mp.reasoning.effort && !mp.reasoning.max_tokens) delete mp.reasoning
+                  modelParams = mp
+                }} />
+                <label class="form-check" style="margin-top:8px;">
+                  <input type="checkbox" checked={modelParams.reasoning?.exclude || false} onchange={(e) => {
+                    const mp = { ...modelParams }
+                    if (!mp.reasoning) mp.reasoning = {}
+                    mp.reasoning.exclude = e.target.checked || undefined
+                    if (!mp.reasoning.effort && !mp.reasoning.max_tokens && !mp.reasoning.exclude) delete mp.reasoning
+                    modelParams = mp
+                  }} />
+                  Exclude from reasoning
+                </label>
+              </div>
+            {:else if param === 'max_tokens'}
+              <div class="param-group">
+                <span class="param-label">Max Tokens</span>
+                <input type="number" class="sb-input" value={modelParams.max_tokens || ''} placeholder="Optional" oninput={(e) => {
+                  const mp = { ...modelParams }
+                  mp.max_tokens = e.target.value ? parseInt(e.target.value) : undefined
+                  if (!mp.max_tokens) delete mp.max_tokens
+                  modelParams = mp
+                }} />
+              </div>
+            {:else if param === 'temperature'}
+              <div class="param-group">
+                <span class="param-label">Temperature</span>
+                <input type="number" class="sb-input" value={modelParams.temperature ?? ''} step="0.1" min="0" max="2" placeholder="Optional" oninput={(e) => {
+                  const mp = { ...modelParams }
+                  mp.temperature = e.target.value ? parseFloat(e.target.value) : undefined
+                  if (mp.temperature === undefined) delete mp.temperature
+                  modelParams = mp
+                }} />
+              </div>
+            {:else if param === 'top_p'}
+              <div class="param-group">
+                <span class="param-label">Top P</span>
+                <input type="number" class="sb-input" value={modelParams.top_p ?? ''} step="0.05" min="0" max="1" placeholder="Optional" oninput={(e) => {
+                  const mp = { ...modelParams }
+                  mp.top_p = e.target.value ? parseFloat(e.target.value) : undefined
+                  if (mp.top_p === undefined) delete mp.top_p
+                  modelParams = mp
+                }} />
+              </div>
+            {:else}
+              <div class="param-group">
+                <span class="param-label">{param}</span>
+                <input class="sb-input" value={modelParams[param] ?? ''} placeholder="Value" oninput={(e) => {
+                  const mp = { ...modelParams }
+                  mp[param] = e.target.value || undefined
+                  if (mp[param] === undefined) delete mp[param]
+                  modelParams = mp
+                }} />
+              </div>
+            {/if}
+          {/each}
+        </div>
+      </div>
+    {/if}
 
     <div class="form-group">
       <label class="form-label">System Prompt</label>
@@ -954,4 +1071,24 @@
     margin-top: 2px;
   }
   .override-add-btn:hover { background: var(--purple-soft); }
+
+  .params-card {
+    background: var(--bg-sidebar);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .param-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .param-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-muted);
+  }
 </style>
