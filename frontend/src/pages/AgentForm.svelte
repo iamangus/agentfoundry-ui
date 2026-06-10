@@ -46,6 +46,9 @@
         api.get('/api/v1/providers'),
         api.get('/agents/list')
       ])
+      console.log('DEBUG loadAll servers:', servers)
+      console.log('DEBUG loadAll providers:', providers)
+      console.log('DEBUG loadAll agents:', agents)
       availableServers = servers
       availableProviders = providers || []
       availableAgents = (agents || []).filter(a => a.name !== def.name)
@@ -127,7 +130,7 @@
       return
     }
     try {
-      const resp = await api.get('/api/v1/models/' + encodeURIComponent(model) + '/capabilities?provider_id=' + encodeURIComponent(providerID))
+      const resp = await api.get('/api/v1/models/capabilities?model=' + encodeURIComponent(model) + '&provider_id=' + encodeURIComponent(providerID))
       modelCapabilities = resp
     } catch {
       modelCapabilities = null
