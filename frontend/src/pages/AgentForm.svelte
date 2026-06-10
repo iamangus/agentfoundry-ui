@@ -33,10 +33,8 @@
   let subAgents = $state([])
   let toolOverrides = $state({})
 
-  $effect(() => {
-    loadAll()
-    loadTeams()
-  })
+  loadAll()
+  loadTeams()
 
   async function loadAll() {
     try {
