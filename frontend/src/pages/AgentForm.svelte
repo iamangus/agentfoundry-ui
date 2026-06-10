@@ -23,6 +23,8 @@
   let providerID = $state(def.provider_id || '')
   let modelCapabilities = $state(null)
   let modelParams = $state(def.model_params ? (typeof def.model_params === 'string' ? JSON.parse(def.model_params) : def.model_params) : {})
+  let _modelCapsResult = null
+  let _modelCapsVersion = $state(0)
   let fetchVersion = $state(0)
   let memoryEnabled = $state(def.memory_enabled || false)
   let memorySearchAgentID = $state(def.memory_search_agent_id || '')
@@ -121,14 +123,21 @@
         if (cancelled || ver !== fetchVersion) return
         const resp = await api.get('/api/v1/models/capabilities?model=' + encodeURIComponent(mdl) + '&provider_id=' + encodeURIComponent(pid))
         if (cancelled || ver !== fetchVersion) return
-        modelCapabilities = resp
+        _modelCapsResult = resp
+        _modelCapsVersion++
       } catch (e) {
         if (cancelled || ver !== fetchVersion) return
         console.error('Model capabilities fetch failed:', e)
-        modelCapabilities = null
+        _modelCapsResult = null
+        _modelCapsVersion++
       }
     })()
     return () => { cancelled = true }
+  })
+
+  $effect(() => {
+    void _modelCapsVersion
+    modelCapabilities = _modelCapsResult
   })
 
   function getServer(name) {
