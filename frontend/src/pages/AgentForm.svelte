@@ -23,7 +23,7 @@
   let providerID = $state(def.provider_id || '')
   let modelCapabilities = $state(null)
   let modelParams = $state(def.model_params ? (typeof def.model_params === 'string' ? JSON.parse(def.model_params) : def.model_params) : {})
-  let capDebounce = $state(null)
+  let fetchVersion = $state(0)
   let memoryEnabled = $state(def.memory_enabled || false)
   let memorySearchAgentID = $state(def.memory_search_agent_id || '')
   let memoryIngestAgentID = $state(def.memory_ingest_agent_id || '')
@@ -106,26 +106,29 @@
     subAgents = subAgents.filter(a => a !== agentName)
   }
 
-  async function fetchCapabilities() {
-    if (!model || !providerID) {
-      modelCapabilities = null
-      return
-    }
-    try {
-      const resp = await api.get('/api/v1/models/capabilities?model=' + encodeURIComponent(model) + '&provider_id=' + encodeURIComponent(providerID))
-      modelCapabilities = resp
-    } catch {
-      modelCapabilities = null
-    }
-  }
-
   $effect(() => {
     const mdl = model
     const pid = providerID
-    if (capDebounce) clearTimeout(capDebounce)
-    capDebounce = setTimeout(() => {
-      fetchCapabilities()
-    }, 500)
+    if (!mdl || !pid) {
+      modelCapabilities = null
+      return
+    }
+    const ver = ++fetchVersion
+    let cancelled = false
+    ;(async () => {
+      try {
+        await new Promise(r => setTimeout(r, 500))
+        if (cancelled || ver !== fetchVersion) return
+        const resp = await api.get('/api/v1/models/capabilities?model=' + encodeURIComponent(mdl) + '&provider_id=' + encodeURIComponent(pid))
+        if (cancelled || ver !== fetchVersion) return
+        modelCapabilities = resp
+      } catch (e) {
+        if (cancelled || ver !== fetchVersion) return
+        console.error('Model capabilities fetch failed:', e)
+        modelCapabilities = null
+      }
+    })()
+    return () => { cancelled = true }
   })
 
   function getServer(name) {
