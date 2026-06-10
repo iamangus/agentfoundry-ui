@@ -10,19 +10,37 @@
   let showVersions = $state(null)
   let versions = $state([])
   let versionsLoading = $state(false)
+  let formServers = $state([])
+  let formProviders = $state([])
+  let agentList = $state([])
 
   $effect(() => {
     loadAgents()
+    loadFormData()
   })
 
   async function loadAgents() {
     try {
       agents = await api.get('/agents/list')
       groups = groupByScope(agents)
+      agentList = agents || []
     } catch (e) {
       console.error('Failed to load agents', e)
     } finally {
       loading = false
+    }
+  }
+
+  async function loadFormData() {
+    try {
+      const [servers, providers] = await Promise.all([
+        api.get('/tools/servers/list'),
+        api.get('/api/v1/providers')
+      ])
+      formServers = servers || []
+      formProviders = providers || []
+    } catch (e) {
+      console.error('Failed to load form data', e)
     }
   }
 
@@ -126,6 +144,9 @@
     isNew={creatingNew}
     onsave={saveAgent}
     oncancel={cancelEdit}
+    servers={formServers}
+    providers={formProviders}
+    agents={agentList}
   />
 {:else}
   <div class="agents-page">

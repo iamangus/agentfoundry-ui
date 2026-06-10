@@ -2,7 +2,7 @@
   import { api } from '../lib/api.js'
   import { teams, loadTeams } from '../lib/stores.js'
 
-  let { def, isNew, onsave, oncancel } = $props()
+  let { def, isNew = false, onsave, oncancel, servers = [], providers = [], agents = [] } = $props()
 
   let name = $state(def.name || '')
   let description = $state(def.description || '')
@@ -16,10 +16,10 @@
   let soEnabled = $state(!!(def.structured_output))
   let soJSON = $state(def.structured_output ? JSON.stringify(def.structured_output, null, 2) : '')
 
-  let availableServers = $state([])
-  let availableAgents = $state([])
-  let availableProviders = $state([])
-  let loading = $state(true)
+  let availableServers = $state(servers)
+  let availableAgents = $state((agents || []).filter(a => a.name !== def.name))
+  let availableProviders = $state(providers || [])
+  let loading = $state(false)
   let providerID = $state(def.provider_id || '')
   let modelCapabilities = $state(null)
   let modelParams = $state(def.model_params ? (typeof def.model_params === 'string' ? JSON.parse(def.model_params) : def.model_params) : {})
@@ -33,27 +33,13 @@
   let subAgents = $state([])
   let toolOverrides = $state({})
 
-  $effect(async () => {
-    try {
-      loading = true
-      const [servers, providers, agents] = await Promise.all([
-        api.get('/tools/servers/list'),
-        api.get('/api/v1/providers'),
-        api.get('/agents/list')
-      ])
-      console.log('DEBUG loadAll servers:', servers)
-      console.log('DEBUG loadAll providers:', providers)
-      console.log('DEBUG loadAll agents:', agents)
-      availableServers = servers
-      availableProviders = providers || []
-      availableAgents = (agents || []).filter(a => a.name !== def.name)
-      initFromDef()
-    } catch (e) {
-      console.error('Failed to load data', e)
-    } finally {
-      loading = false
-    }
-    loadTeams()
+  loadTeams()
+
+  $effect(() => {
+    availableServers = servers
+    availableProviders = providers || []
+    availableAgents = (agents || []).filter(a => a.name !== def.name)
+    initFromDef()
   })
 
   function initFromDef() {
@@ -336,7 +322,6 @@
           <option value={p.id}>{p.name} ({p.provider_type})</option>
         {/each}
       </select>
-      {console.log('[RENDER] availableProviders:', availableProviders, 'length:', availableProviders.length, 'providerID:', providerID)}
     </div>
 
     {#if modelCapabilities && modelCapabilities.supported_parameters && modelCapabilities.supported_parameters.length > 0}
