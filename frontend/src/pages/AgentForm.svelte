@@ -340,6 +340,7 @@
           <option value={p.id}>{p.name} ({p.provider_type})</option>
         {/each}
       </select>
+      {console.log('[RENDER] availableProviders:', availableProviders, 'length:', availableProviders.length, 'providerID:', providerID)}
     </div>
 
     {#if modelCapabilities && modelCapabilities.supported_parameters && modelCapabilities.supported_parameters.length > 0}
