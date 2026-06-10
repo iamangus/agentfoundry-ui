@@ -33,10 +33,7 @@
   let subAgents = $state([])
   let toolOverrides = $state({})
 
-  loadAll()
-  loadTeams()
-
-  async function loadAll() {
+  $effect(async () => {
     try {
       loading = true
       const [servers, providers, agents] = await Promise.all([
@@ -56,7 +53,8 @@
     } finally {
       loading = false
     }
-  }
+    loadTeams()
+  })
 
   function initFromDef() {
     if (!def.tools || def.tools.length === 0) return
