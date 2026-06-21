@@ -27,7 +27,7 @@ type Message struct {
 	Time    time.Time `json:"time"`
 }
 
-type PostMessageResponse struct {
+type RunAgentResponse struct {
 	RunID string `json:"run_id"`
 }
 
@@ -351,12 +351,16 @@ func (c *Client) ListSessions(ctx context.Context) ([]*Session, error) {
 	return sessions, nil
 }
 
-func (c *Client) PostMessage(ctx context.Context, sessionID, message string) (*PostMessageResponse, error) {
-	resp, err := c.postJSON(ctx, "/api/v1/chat/sessions/"+url.PathEscape(sessionID)+"/messages", map[string]string{"message": message})
+func (c *Client) RunAgent(ctx context.Context, agentID, message, sessionID string) (*RunAgentResponse, error) {
+	body := map[string]string{"message": message}
+	if sessionID != "" {
+		body["session_id"] = sessionID
+	}
+	resp, err := c.postJSON(ctx, "/api/v1/agents/"+url.PathEscape(agentID)+"/run", body)
 	if err != nil {
 		return nil, err
 	}
-	var result PostMessageResponse
+	var result RunAgentResponse
 	if err := c.decodeJSON(resp, &result); err != nil {
 		return nil, err
 	}
@@ -364,7 +368,7 @@ func (c *Client) PostMessage(ctx context.Context, sessionID, message string) (*P
 }
 
 func (c *Client) StreamRunEvents(ctx context.Context, runID string) (*http.Response, error) {
-	u := c.baseURL.JoinPath("/api/v1/chat/runs/" + url.PathEscape(runID) + "/events")
+	u := c.baseURL.JoinPath("/api/v1/runs/" + url.PathEscape(runID) + "/events")
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
 		return nil, err

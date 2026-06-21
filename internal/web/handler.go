@@ -33,8 +33,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /chat/sessions/list", h.jsonSessionList)
 	mux.HandleFunc("GET /chat/sessions/{id}", h.jsonSessionGet)
 	mux.HandleFunc("POST /chat/sessions", h.jsonCreateSession)
-	mux.HandleFunc("POST /chat/sessions/{id}/messages", h.jsonPostMessage)
-	mux.HandleFunc("GET /chat/runs/{id}/events", h.runEvents)
+	mux.HandleFunc("GET /runs/{id}/events", h.runEvents)
 
 	mux.HandleFunc("GET /agents/list", h.jsonAgentList)
 	mux.HandleFunc("GET /agents/{name}/edit", h.jsonAgentGet)
@@ -104,29 +103,6 @@ func (h *Handler) jsonCreateSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, sess)
-}
-
-func (h *Handler) jsonPostMessage(w http.ResponseWriter, r *http.Request) {
-	sessionID := r.PathValue("id")
-	var req struct {
-		Message string `json:"message"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid JSON: message required", http.StatusBadRequest)
-		return
-	}
-	if req.Message == "" {
-		http.Error(w, "message is required", http.StatusBadRequest)
-		return
-	}
-
-	result, err := h.client.PostMessage(r.Context(), sessionID, req.Message)
-	if err != nil {
-		slog.Error("failed to post message", "session", sessionID, "error", err)
-		http.Error(w, "backend error", http.StatusBadGateway)
-		return
-	}
-	writeJSON(w, result)
 }
 
 func (h *Handler) runEvents(w http.ResponseWriter, r *http.Request) {
@@ -519,6 +495,7 @@ func definitionFromJSON(r *http.Request) (*api.Definition, error) {
 		MemorySearchAgentID  string                `json:"memory_search_agent_id"`
 		MemoryIngestAgentID  string                `json:"memory_ingest_agent_id"`
 		ToolOverrides        json.RawMessage       `json:"tool_overrides"`
+		ModelParams          json.RawMessage       `json:"model_params"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&formData); err != nil {
 		return nil, fmt.Errorf("invalid JSON: %w", err)
@@ -542,6 +519,7 @@ func definitionFromJSON(r *http.Request) (*api.Definition, error) {
 		MemorySearchAgentID:  formData.MemorySearchAgentID,
 		MemoryIngestAgentID:  formData.MemoryIngestAgentID,
 		ToolOverrides:        formData.ToolOverrides,
+		ModelParams:          formData.ModelParams,
 	}
 	return def, nil
 }

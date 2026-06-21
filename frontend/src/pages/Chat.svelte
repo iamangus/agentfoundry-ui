@@ -91,7 +91,7 @@
     requestAnimationFrame(() => scrollDown())
 
     try {
-      const result = await api.post('/api/v1/chat/sessions/' + currentSession.id + '/messages', { message: content })
+      const result = await api.post('/api/v1/agents/' + currentSession.agent_id + '/run', { message: content, session_id: currentSession.id })
       startStream(result.run_id)
     } catch (e) {
       console.error('Failed to send message', e)
@@ -105,7 +105,7 @@
     streamBubbles = []
     streamingRaw = ''
 
-    const es = new EventSource('/chat/runs/' + runId + '/events')
+    const es = new EventSource('/runs/' + runId + '/events')
     eventSource = es
 
     es.addEventListener('response_start', () => {

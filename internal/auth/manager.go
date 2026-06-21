@@ -323,7 +323,7 @@ func (m *Manager) RefreshAccessToken(ctx context.Context, refreshToken string) (
 
 func isAPIRequest(r *http.Request) bool {
 	path := r.URL.Path
-	if strings.HasPrefix(path, "/chat/sessions") || strings.HasPrefix(path, "/chat/runs") {
+	if strings.HasPrefix(path, "/chat/sessions") || strings.HasPrefix(path, "/runs/") {
 		return true
 	}
 	if strings.HasPrefix(path, "/agents/") {
