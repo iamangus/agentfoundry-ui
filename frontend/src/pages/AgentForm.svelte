@@ -23,7 +23,7 @@
   let providerID = $state(def.provider_id || '')
   let modelCapsPromise = $state(Promise.resolve(null))
   let modelParams = $state(def.model_params ? (typeof def.model_params === 'string' ? JSON.parse(def.model_params) : def.model_params) : {})
-  let fetchVersion = $state(0)
+  let fetchVersion = 0
   let memoryEnabled = $state(def.memory_enabled || false)
   let memorySearchAgentID = $state(def.memory_search_agent_id || '')
   let memoryIngestAgentID = $state(def.memory_ingest_agent_id || '')
