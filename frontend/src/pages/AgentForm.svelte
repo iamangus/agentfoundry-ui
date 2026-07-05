@@ -32,6 +32,7 @@
   let expandedServer = $state(null)
   let subAgents = $state([])
   let toolOverrides = $state({})
+  let initialized = $state(false)
 
   loadTeams()
 
@@ -39,7 +40,10 @@
     availableServers = servers
     availableProviders = providers || []
     availableAgents = (agents || []).filter(a => a.name !== def.name)
-    initFromDef()
+    if (!initialized) {
+      initFromDef()
+      initialized = true
+    }
   })
 
   function initFromDef() {
@@ -60,6 +64,7 @@
     enabledTools = et
     selectedServers = Object.keys(et)
     subAgents = sa
+    expandedServer = null
     if (def.tool_overrides) {
       try {
         toolOverrides = typeof def.tool_overrides === 'string' ? JSON.parse(def.tool_overrides) : def.tool_overrides
