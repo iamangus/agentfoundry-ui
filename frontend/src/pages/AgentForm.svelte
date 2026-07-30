@@ -26,7 +26,8 @@
 let modelParamsExpanded = $state(false)
 	let customParamsRaw = $state('')
 	let customParamsDirty = $state(false)
-	let fetchVersion = 0  let memoryEnabled = $state(def.memory_enabled || false)
+	let fetchVersion = 0
+  let memoryEnabled = $state(def.memory_enabled || false)
   let memorySearchAgentID = $state(def.memory_search_agent_id || '')
   let memoryIngestAgentID = $state(def.memory_ingest_agent_id || '')
   let enabledTools = $state({})
