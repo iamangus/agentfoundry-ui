@@ -39,6 +39,8 @@ type Definition struct {
 	MemoryIngestAgentID  string `json:"memory_ingest_agent_id,omitempty"`
 	ToolOverrides        json.RawMessage `json:"tool_overrides,omitempty"`
 	ModelParams          json.RawMessage `json:"model_params,omitempty"`
+	HandoffTo             string   `json:"handoff_to,omitempty"`
+	Handoffs              []string `json:"handoffs,omitempty"`
 }
 
 type StructuredOutput struct {

@@ -496,6 +496,8 @@ func definitionFromJSON(r *http.Request) (*api.Definition, error) {
 		MemoryIngestAgentID  string                `json:"memory_ingest_agent_id"`
 		ToolOverrides        json.RawMessage       `json:"tool_overrides"`
 		ModelParams          json.RawMessage       `json:"model_params"`
+		HandoffTo             string                `json:"handoff_to"`
+		Handoffs              []string              `json:"handoffs"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&formData); err != nil {
 		return nil, fmt.Errorf("invalid JSON: %w", err)
@@ -520,6 +522,8 @@ func definitionFromJSON(r *http.Request) (*api.Definition, error) {
 		MemoryIngestAgentID:  formData.MemoryIngestAgentID,
 		ToolOverrides:        formData.ToolOverrides,
 		ModelParams:          formData.ModelParams,
+		HandoffTo:             formData.HandoffTo,
+		Handoffs:              formData.Handoffs,
 	}
 	return def, nil
 }
