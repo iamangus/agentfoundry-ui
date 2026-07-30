@@ -31,6 +31,8 @@
   let selectedServers = $state([])
   let expandedServer = $state(null)
   let subAgents = $state([])
+  let handoffTo = $state(def.handoff_to || '')
+  let handoffs = $state(def.handoffs ? [...def.handoffs] : [])
   let toolOverrides = $state({})
   let initialized = $state(false)
 
@@ -64,6 +66,8 @@
     enabledTools = et
     selectedServers = Object.keys(et)
     subAgents = sa
+    handoffTo = def.handoff_to || ''
+    handoffs = def.handoffs ? [...def.handoffs] : []
     expandedServer = null
     if (def.tool_overrides) {
       try {
@@ -109,6 +113,20 @@
 
   function removeSubAgent(agentName) {
     subAgents = subAgents.filter(a => a !== agentName)
+  }
+
+  function addHandoff(agentName) {
+    if (handoffs.includes(agentName)) return
+    if (agentName === name) return
+    handoffs = [...handoffs, agentName]
+  }
+
+  function removeHandoff(agentName) {
+    handoffs = handoffs.filter(a => a !== agentName)
+  }
+
+  function availableHandoffOptions() {
+    return availableAgents.filter(a => !handoffs.includes(a.name) && a.name !== handoffTo)
   }
 
   $effect(() => {
@@ -290,6 +308,8 @@
       memory_search_agent_id: memorySearchAgentID,
       memory_ingest_agent_id: memoryIngestAgentID,
       tool_overrides: JSON.stringify(toolOverrides),
+      handoff_to: handoffTo || '',
+      handoffs: handoffs.length > 0 ? handoffs : undefined,
       kind: 'agent',
     })
   }
@@ -658,6 +678,55 @@
       </label>
       {#if soEnabled}
         <textarea value={soJSON} oninput={(e) => soJSON = e.target.value} class="sb-input form-textarea mono" placeholder='"name": "", "schema": null, "strict": false' rows="8" style="margin-top:8px;"></textarea>
+      {/if}
+    </div>
+
+    <div class="form-group">
+      <div class="tool-divider"></div>
+      <div class="tool-section-label">Handoffs</div>
+      <p class="tool-hint" style="margin-bottom:12px;">Deterministic handoff routes the agent to another agent when it would return its final response. LLM-invoked handoffs expose <code>handoff_to_&lt;agent&gt;</code> tools the model can call mid-conversation to transfer control.</p>
+
+      <label class="form-label" style="margin-bottom:4px;">Deterministic handoff target</label>
+      <select class="sb-input tool-server-select" value={handoffTo} onchange={(e) => handoffTo = e.target.value}>
+        <option value="">None (no deterministic handoff)</option>
+        {#each availableAgents as a}
+          <option value={a.name} disabled={handoffs.includes(a.name)}>{a.name}{handoffs.includes(a.name) ? ' (in handoffs list)' : ''}</option>
+        {/each}
+      </select>
+
+      <label class="form-label" style="margin-top:16px; margin-bottom:4px;">LLM-invoked handoffs</label>
+      {#if availableHandoffOptions().length > 0}
+        <div class="tool-add-row">
+          <select class="sb-input tool-server-select" id="handoff-select">
+            <option value="">-- Select agent --</option>
+            {#each availableHandoffOptions() as a}
+              <option value={a.name}>{a.name}</option>
+            {/each}
+          </select>
+          <button class="sb-submit" style="width:auto; padding:9px 16px; font-size:0.82rem;" onclick={() => {
+            const sel = document.getElementById('handoff-select')
+            if (sel && sel.value) { addHandoff(sel.value); sel.value = '' }
+          }}>Add</button>
+        </div>
+      {/if}
+
+      {#if handoffs.length > 0}
+        <div class="sub-agent-list">
+          {#each handoffs as agentName}
+            <div class="sub-agent-chip">
+              <span class="sub-agent-icon">↪</span>
+              <div class="sub-agent-info">
+                <span class="sub-agent-name">{agentName}</span>
+                {#if getAgentDesc(agentName)}
+                  <span class="sub-agent-desc">{getAgentDesc(agentName)}</span>
+                {/if}
+              </div>
+              <button class="sub-agent-remove" onclick={() => removeHandoff(agentName)} title="Remove">&times;</button>
+            </div>
+          {/each}
+        </div>
+      {:else}
+        <p class="tool-hint" style="margin-bottom:16px;">No LLM-invoked handoffs selected.</p>
       {/if}
     </div>
 
