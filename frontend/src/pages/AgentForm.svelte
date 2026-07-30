@@ -479,7 +479,7 @@ let modelParamsExpanded = $state(false)
                 <span class="param-label">Custom Parameters (JSON)</span>
                 <textarea
                   class="sb-input form-textarea"
-                  placeholder='{"provider": {"order": ["ProviderName"]}}'
+                  placeholder={"{\"provider\": {\"order\": [\"ProviderName\"]}}"}
                   rows="3"
                   spellcheck="false"
                   value={customParamsRaw}
