@@ -23,9 +23,10 @@
   let providerID = $state(def.provider_id || '')
   let modelCapsPromise = $state(Promise.resolve(null))
   let modelParams = $state(def.model_params ? (typeof def.model_params === 'string' ? JSON.parse(def.model_params) : def.model_params) : {})
-  let modelParamsExpanded = $state(false)
-  let fetchVersion = 0
-  let memoryEnabled = $state(def.memory_enabled || false)
+let modelParamsExpanded = $state(false)
+	let customParamsRaw = $state('')
+	let customParamsDirty = $state(false)
+	let fetchVersion = 0  let memoryEnabled = $state(def.memory_enabled || false)
   let memorySearchAgentID = $state(def.memory_search_agent_id || '')
   let memoryIngestAgentID = $state(def.memory_ingest_agent_id || '')
   let enabledTools = $state({})
@@ -47,6 +48,20 @@
       initFromDef()
       initialized = true
     }
+  })
+
+  $effect(() => {
+    if (customParamsDirty) return
+    const mp = { ...modelParams }
+    modelCapsPromise.then(caps => {
+      if (!caps?.supported_parameters) return
+      const supported = caps.supported_parameters
+      const custom = {}
+      for (const k of Object.keys(mp)) {
+        if (!supported.includes(k)) custom[k] = mp[k]
+      }
+      customParamsRaw = Object.keys(custom).length ? JSON.stringify(custom, null, 2) : ''
+    })
   })
 
   function initFromDef() {
@@ -288,6 +303,17 @@
       }
     }
 
+    if (customParamsRaw.trim()) {
+      let custom
+      try {
+        custom = JSON.parse(customParamsRaw)
+      } catch {
+        alert('Invalid custom parameters JSON')
+        return
+      }
+      modelParams = { ...modelParams, ...custom }
+    }
+
       const mpObj = Object.keys(modelParams).length > 0 ? modelParams : undefined
 
       onsave({
@@ -448,6 +474,21 @@
                   </div>
                 {/if}
               {/each}
+              <div class="param-group" style="margin-top:8px; padding-top:8px; border-top:1px solid var(--border);">
+                <span class="param-label">Custom Parameters (JSON)</span>
+                <textarea
+                  class="sb-input form-textarea"
+                  placeholder='{"provider": {"order": ["ProviderName"]}}'
+                  rows="3"
+                  spellcheck="false"
+                  value={customParamsRaw}
+                  oninput={(e) => {
+                    customParamsRaw = e.target.value
+                    customParamsDirty = true
+                  }}
+                ></textarea>
+                <span class="param-hint" style="margin-top:4px;font-size:0.73rem;color:var(--text-muted);">Provider-specific parameters merged at save time.</span>
+              </div>
             </div>
           {/if}
         </div>
