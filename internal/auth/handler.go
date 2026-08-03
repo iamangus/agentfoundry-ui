@@ -36,6 +36,7 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 		Value:    state,
 		Path:     "/",
 		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
 		MaxAge:   600,
 	})
 
@@ -56,7 +57,16 @@ func (h *Handler) callback(w http.ResponseWriter, r *http.Request) {
 	returnedState := r.URL.Query().Get("state")
 	if returnedState == "" || returnedState != stateCookie.Value {
 		slog.Error("callback: state mismatch", "returned", returnedState, "cookie", stateCookie.Value)
-		http.Error(w, "invalid state parameter", http.StatusBadRequest)
+		// The state cookie can be clobbered if the login flow was started twice
+		// (e.g. a stale redirect from a previous attempt). Clear it and restart
+		// the flow instead of hard-failing.
+		http.SetCookie(w, &http.Cookie{
+			Name:   "oauth_state",
+			Value:  "",
+			Path:   "/",
+			MaxAge: -1,
+		})
+		http.Redirect(w, r, "/auth/login", http.StatusFound)
 		return
 	}
 

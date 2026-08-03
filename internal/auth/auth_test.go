@@ -318,8 +318,13 @@ func TestHandler_Callback_StateMismatch(t *testing.T) {
 	rec := httptest.NewRecorder()
 	h.callback(rec, req)
 
-	if rec.Code != http.StatusBadRequest {
-		t.Errorf("got status %d, want 400", rec.Code)
+	// A mismatched state clears the cookie and restarts the login flow rather
+	// than hard-failing, so the user can simply log in again.
+	if rec.Code != http.StatusFound {
+		t.Errorf("got status %d, want 302", rec.Code)
+	}
+	if loc := rec.Header().Get("Location"); loc != "/auth/login" {
+		t.Errorf("got redirect location %q, want /auth/login", loc)
 	}
 }
 
