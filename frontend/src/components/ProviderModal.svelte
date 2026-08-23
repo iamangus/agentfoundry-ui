@@ -131,6 +131,7 @@
       <option value="anthropic">Anthropic</option>
       <option value="openrouter">OpenRouter</option>
       <option value="ollama">Ollama</option>
+      <option value="llama-server">llama-server</option>
       <option value="custom">Custom</option>
     </select>
 
