@@ -163,6 +163,27 @@ let modelParamsExpanded = $state(false)
 		)
 	}
 
+	function mcpToolConfig(processor) {
+		try {
+			return JSON.parse(processor.configText || '{}')
+		} catch {
+			return {}
+		}
+	}
+
+	function mcpTools(processor) {
+		const server = getServer(mcpToolConfig(processor).server)
+		return server?.tools || []
+	}
+
+	function updateMCPToolConfig(index, field, value) {
+		const processor = preInferenceProcessors[index]
+		const config = mcpToolConfig(processor)
+		config[field] = value
+		if (field === 'server') config.tool = ''
+		updatePreInferenceProcessor(index, 'configText', JSON.stringify(config, null, 2))
+	}
+
 	function removePreInferenceProcessor(index) {
 		preInferenceProcessors = preInferenceProcessors.filter((_, current) => current !== index)
 	}
@@ -590,6 +611,22 @@ let modelParamsExpanded = $state(false)
 									<option value="fail">fail on error</option>
 								</select>
 							</div>
+							{#if processor.processor === 'mcp_tool'}
+								<div class="processor-fields">
+									<select class="sb-input" value={mcpToolConfig(processor).server || ''} onchange={(e) => updateMCPToolConfig(index, 'server', e.target.value)}>
+										<option value="">Select MCP server</option>
+										{#each availableServers as server}
+											<option value={server.name}>{server.name}</option>
+										{/each}
+									</select>
+									<select class="sb-input" value={mcpToolConfig(processor).tool || ''} disabled={!mcpToolConfig(processor).server} onchange={(e) => updateMCPToolConfig(index, 'tool', e.target.value)}>
+										<option value="">Select tool</option>
+										{#each mcpTools(processor) as tool}
+											<option value={tool.name}>{tool.name}</option>
+										{/each}
+									</select>
+								</div>
+							{/if}
 							<div class="form-label" style="margin-top:10px;">Timeout (seconds, 0 uses default)</div>
 							<input class="sb-input processor-timeout" type="number" min="0" value={processor.timeout || 0} oninput={(e) => updatePreInferenceProcessor(index, 'timeout', e.target.valueAsNumber || 0)} />
 							<div class="form-label" style="margin-top:10px;">Configuration (JSON)</div>
