@@ -230,6 +230,11 @@ func (h *Handler) jsonCloneAgent(w http.ResponseWriter, r *http.Request) {
 	clone.Name = cloneName
 	clone.AgentID = ""
 	clone.Tools = append([]string(nil), src.Tools...)
+	clone.PreInferenceProcessors = make([]api.PreInferenceProcessor, len(src.PreInferenceProcessors))
+	for i, processor := range src.PreInferenceProcessors {
+		clone.PreInferenceProcessors[i] = processor
+		clone.PreInferenceProcessors[i].Config = append(json.RawMessage(nil), processor.Config...)
+	}
 	if src.StructuredOutput != nil {
 		so := *src.StructuredOutput
 		clone.StructuredOutput = &so
@@ -478,52 +483,54 @@ func writeJSON(w http.ResponseWriter, v any) {
 
 func definitionFromJSON(r *http.Request) (*api.Definition, error) {
 	var formData struct {
-		Kind               string                `json:"kind"`
-		Name               string                `json:"name"`
-		Description        string                `json:"description"`
-		Model              string                `json:"model"`
-		SystemPrompt       string                `json:"system_prompt"`
-		Tools              []string              `json:"tools"`
-		MaxTurns           int                   `json:"max_turns"`
-		MaxConcurrentTools int                   `json:"max_concurrent_tools"`
-		ForceJSON          bool                  `json:"force_json"`
-		Scope              string                `json:"scope"`
-		Team               string                `json:"team"`
-		ProviderID           string                `json:"provider_id"`
-		StructuredOutput     *api.StructuredOutput `json:"structured_output"`
-		MemoryEnabled        bool                  `json:"memory_enabled"`
-		MemorySearchAgentID  string                `json:"memory_search_agent_id"`
-		MemoryIngestAgentID  string                `json:"memory_ingest_agent_id"`
-		ToolOverrides        json.RawMessage       `json:"tool_overrides"`
-		ModelParams          json.RawMessage       `json:"model_params"`
-		HandoffTo             string                `json:"handoff_to"`
-		Handoffs              []string              `json:"handoffs"`
+		Kind                   string                      `json:"kind"`
+		Name                   string                      `json:"name"`
+		Description            string                      `json:"description"`
+		Model                  string                      `json:"model"`
+		SystemPrompt           string                      `json:"system_prompt"`
+		Tools                  []string                    `json:"tools"`
+		MaxTurns               int                         `json:"max_turns"`
+		MaxConcurrentTools     int                         `json:"max_concurrent_tools"`
+		ForceJSON              bool                        `json:"force_json"`
+		Scope                  string                      `json:"scope"`
+		Team                   string                      `json:"team"`
+		ProviderID             string                      `json:"provider_id"`
+		StructuredOutput       *api.StructuredOutput       `json:"structured_output"`
+		MemoryEnabled          bool                        `json:"memory_enabled"`
+		MemorySearchAgentID    string                      `json:"memory_search_agent_id"`
+		MemoryIngestAgentID    string                      `json:"memory_ingest_agent_id"`
+		ToolOverrides          json.RawMessage             `json:"tool_overrides"`
+		ModelParams            json.RawMessage             `json:"model_params"`
+		PreInferenceProcessors []api.PreInferenceProcessor `json:"pre_inference_processors"`
+		HandoffTo              string                      `json:"handoff_to"`
+		Handoffs               []string                    `json:"handoffs"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&formData); err != nil {
 		return nil, fmt.Errorf("invalid JSON: %w", err)
 	}
 
 	def := &api.Definition{
-		Kind:               api.KindAgent,
-		Name:               formData.Name,
-		Description:        formData.Description,
-		Model:              formData.Model,
-		SystemPrompt:       formData.SystemPrompt,
-		Tools:              formData.Tools,
-		MaxTurns:           formData.MaxTurns,
-		MaxConcurrentTools: formData.MaxConcurrentTools,
-		ForceJSON:          formData.ForceJSON,
-		Scope:              formData.Scope,
-		Team:               formData.Team,
-		ProviderID:           formData.ProviderID,
-		StructuredOutput:     formData.StructuredOutput,
-		MemoryEnabled:        formData.MemoryEnabled,
-		MemorySearchAgentID:  formData.MemorySearchAgentID,
-		MemoryIngestAgentID:  formData.MemoryIngestAgentID,
-		ToolOverrides:        formData.ToolOverrides,
-		ModelParams:          formData.ModelParams,
-		HandoffTo:             formData.HandoffTo,
-		Handoffs:              formData.Handoffs,
+		Kind:                   api.KindAgent,
+		Name:                   formData.Name,
+		Description:            formData.Description,
+		Model:                  formData.Model,
+		SystemPrompt:           formData.SystemPrompt,
+		Tools:                  formData.Tools,
+		MaxTurns:               formData.MaxTurns,
+		MaxConcurrentTools:     formData.MaxConcurrentTools,
+		ForceJSON:              formData.ForceJSON,
+		Scope:                  formData.Scope,
+		Team:                   formData.Team,
+		ProviderID:             formData.ProviderID,
+		StructuredOutput:       formData.StructuredOutput,
+		MemoryEnabled:          formData.MemoryEnabled,
+		MemorySearchAgentID:    formData.MemorySearchAgentID,
+		MemoryIngestAgentID:    formData.MemoryIngestAgentID,
+		ToolOverrides:          formData.ToolOverrides,
+		ModelParams:            formData.ModelParams,
+		PreInferenceProcessors: formData.PreInferenceProcessors,
+		HandoffTo:              formData.HandoffTo,
+		Handoffs:               formData.Handoffs,
 	}
 	return def, nil
 }

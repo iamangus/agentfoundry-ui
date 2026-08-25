@@ -36,6 +36,10 @@ let modelParamsExpanded = $state(false)
   let subAgents = $state([])
   let handoffTo = $state(def.handoff_to || '')
   let handoffs = $state(def.handoffs ? [...def.handoffs] : [])
+	let preInferenceProcessors = $state((def.pre_inference_processors || []).map((processor) => ({
+		...processor,
+		configText: JSON.stringify(processor.config || {}, null, 2),
+	})))
   let toolOverrides = $state({})
   let initialized = $state(false)
 
@@ -141,6 +145,37 @@ let modelParamsExpanded = $state(false)
   function removeHandoff(agentName) {
     handoffs = handoffs.filter(a => a !== agentName)
   }
+
+	function addPreInferenceProcessor() {
+		preInferenceProcessors = [...preInferenceProcessors, {
+			id: '',
+			processor: 'mcp_tool',
+			phase: 'run_start',
+			on_error: 'warn',
+			timeout: 0,
+			configText: '{\n  "server": "",\n  "tool": ""\n}',
+		}]
+	}
+
+	function updatePreInferenceProcessor(index, field, value) {
+		preInferenceProcessors = preInferenceProcessors.map((processor, current) =>
+			current === index ? { ...processor, [field]: value } : processor,
+		)
+	}
+
+	function removePreInferenceProcessor(index) {
+		preInferenceProcessors = preInferenceProcessors.filter((_, current) => current !== index)
+	}
+
+	function movePreInferenceProcessor(index, direction) {
+		const target = index + direction
+		if (target < 0 || target >= preInferenceProcessors.length) return
+		const processors = [...preInferenceProcessors]
+		const current = processors[index]
+		processors[index] = processors[target]
+		processors[target] = current
+		preInferenceProcessors = processors
+	}
 
   function availableHandoffOptions() {
     return availableAgents.filter(a => !handoffs.includes(a.name) && a.name !== handoffTo)
@@ -315,6 +350,25 @@ let modelParamsExpanded = $state(false)
       modelParams = { ...modelParams, ...custom }
     }
 
+		const processors = []
+		for (const processor of preInferenceProcessors) {
+			let processorConfig
+			try {
+				processorConfig = JSON.parse(processor.configText || '{}')
+			} catch {
+				alert(`Invalid JSON configuration for pre-inference processor ${processor.id || processor.processor || 'new processor'}`)
+				return
+			}
+			processors.push({
+				id: processor.id,
+				processor: processor.processor,
+				phase: processor.phase || 'run_start',
+				config: processorConfig,
+				on_error: processor.on_error || 'warn',
+				timeout: processor.timeout || 0,
+			})
+		}
+
       const mpObj = Object.keys(modelParams).length > 0 ? modelParams : undefined
 
       onsave({
@@ -337,8 +391,9 @@ let modelParamsExpanded = $state(false)
       memory_ingest_agent_id: memoryIngestAgentID,
       tool_overrides: JSON.stringify(toolOverrides),
       handoff_to: handoffTo || '',
-      handoffs: handoffs.length > 0 ? handoffs : undefined,
-      kind: 'agent',
+       handoffs: handoffs.length > 0 ? handoffs : undefined,
+		pre_inference_processors: processors,
+       kind: 'agent',
     })
   }
 </script>
@@ -500,6 +555,50 @@ let modelParamsExpanded = $state(false)
       <label class="form-label">System Prompt</label>
       <textarea value={systemPrompt} oninput={(e) => systemPrompt = e.target.value} class="sb-input form-textarea" placeholder="System prompt..." rows="6"></textarea>
     </div>
+
+		<div class="form-group">
+			<div class="tool-section-header">
+				<div>
+					<div class="form-label" style="margin-bottom:2px;">Pre-inference processors</div>
+					<p class="tool-hint">Run once before the initial inference. Processors contribute context to the system prompt in this order.</p>
+				</div>
+				<button class="sb-submit" style="width:auto; padding:7px 12px; font-size:0.78rem;" onclick={addPreInferenceProcessor}>Add processor</button>
+			</div>
+			{#if preInferenceProcessors.length === 0}
+				<p class="tool-hint">No pre-inference processors configured.</p>
+			{:else}
+				<div class="processor-list">
+					{#each preInferenceProcessors as processor, index}
+						<div class="processor-card">
+							<div class="processor-card-header">
+								<span class="tool-section-label" style="margin:0;">Processor {index + 1}</span>
+								<div class="processor-actions">
+									<button class="action-btn" disabled={index === 0} onclick={() => movePreInferenceProcessor(index, -1)}>Up</button>
+									<button class="action-btn" disabled={index === preInferenceProcessors.length - 1} onclick={() => movePreInferenceProcessor(index, 1)}>Down</button>
+									<button class="action-btn action-btn-delete" onclick={() => removePreInferenceProcessor(index)}>Remove</button>
+								</div>
+							</div>
+							<div class="processor-fields">
+								<input class="sb-input" placeholder="ID (optional)" value={processor.id} oninput={(e) => updatePreInferenceProcessor(index, 'id', e.target.value)} />
+								<input class="sb-input" placeholder="Processor type" value={processor.processor} oninput={(e) => updatePreInferenceProcessor(index, 'processor', e.target.value)} />
+								<select class="sb-input" value={processor.phase || 'run_start'} onchange={(e) => updatePreInferenceProcessor(index, 'phase', e.target.value)}>
+									<option value="run_start">run_start</option>
+								</select>
+								<select class="sb-input" value={processor.on_error || 'warn'} onchange={(e) => updatePreInferenceProcessor(index, 'on_error', e.target.value)}>
+									<option value="warn">warn on error</option>
+									<option value="skip">skip on error</option>
+									<option value="fail">fail on error</option>
+								</select>
+							</div>
+							<div class="form-label" style="margin-top:10px;">Timeout (seconds, 0 uses default)</div>
+							<input class="sb-input processor-timeout" type="number" min="0" value={processor.timeout || 0} oninput={(e) => updatePreInferenceProcessor(index, 'timeout', e.target.valueAsNumber || 0)} />
+							<div class="form-label" style="margin-top:10px;">Configuration (JSON)</div>
+							<textarea class="sb-input form-textarea mono" rows="4" value={processor.configText} oninput={(e) => updatePreInferenceProcessor(index, 'configText', e.target.value)}></textarea>
+						</div>
+					{/each}
+				</div>
+			{/if}
+		</div>
 
     <div class="form-group">
       <div class="tool-section-header">
@@ -1128,6 +1227,40 @@ let modelParamsExpanded = $state(false)
     background: var(--bg-sidebar);
     border-radius: 6px;
   }
+	.processor-list {
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+		margin-top: 10px;
+	}
+	.processor-card {
+		background: var(--bg-sidebar);
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		padding: 12px;
+	}
+	.processor-card-header,
+	.processor-actions,
+	.processor-fields {
+		display: flex;
+		align-items: center;
+	}
+	.processor-card-header {
+		justify-content: space-between;
+		gap: 12px;
+	}
+	.processor-actions {
+		gap: 6px;
+	}
+	.processor-fields {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 8px;
+		margin-top: 10px;
+	}
+	.processor-timeout {
+		max-width: 180px;
+	}
   .tool-override-tool-name {
     font-size: 0.75rem;
     font-weight: 600;

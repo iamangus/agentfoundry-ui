@@ -19,28 +19,38 @@ var (
 )
 
 type Definition struct {
-	AgentID            string            `json:"agent_id,omitempty"`
-	ProviderID         string            `json:"provider_id,omitempty"`
-	Kind               Kind              `json:"kind"`
-	Name               string            `json:"name"`
-	Description        string            `json:"description,omitempty"`
-	Model              string            `json:"model,omitempty"`
-	SystemPrompt       string            `json:"system_prompt"`
-	Tools              []string          `json:"tools,omitempty"`
-	MaxTurns           int               `json:"max_turns,omitempty"`
-	MaxConcurrentTools int               `json:"max_concurrent_tools,omitempty"`
-	ForceJSON          bool              `json:"force_json,omitempty"`
-	StructuredOutput   *StructuredOutput `json:"structured_output,omitempty"`
-	Scope              string            `json:"scope,omitempty"`
-	Team               string            `json:"team,omitempty"`
-	CreatedBy          string            `json:"created_by,omitempty"`
-	MemoryEnabled        bool   `json:"memory_enabled,omitempty"`
-	MemorySearchAgentID  string `json:"memory_search_agent_id,omitempty"`
-	MemoryIngestAgentID  string `json:"memory_ingest_agent_id,omitempty"`
-	ToolOverrides        json.RawMessage `json:"tool_overrides,omitempty"`
-	ModelParams          json.RawMessage `json:"model_params,omitempty"`
-	HandoffTo             string   `json:"handoff_to,omitempty"`
-	Handoffs              []string `json:"handoffs,omitempty"`
+	AgentID                string                  `json:"agent_id,omitempty"`
+	ProviderID             string                  `json:"provider_id,omitempty"`
+	Kind                   Kind                    `json:"kind"`
+	Name                   string                  `json:"name"`
+	Description            string                  `json:"description,omitempty"`
+	Model                  string                  `json:"model,omitempty"`
+	SystemPrompt           string                  `json:"system_prompt"`
+	Tools                  []string                `json:"tools,omitempty"`
+	MaxTurns               int                     `json:"max_turns,omitempty"`
+	MaxConcurrentTools     int                     `json:"max_concurrent_tools,omitempty"`
+	ForceJSON              bool                    `json:"force_json,omitempty"`
+	StructuredOutput       *StructuredOutput       `json:"structured_output,omitempty"`
+	Scope                  string                  `json:"scope,omitempty"`
+	Team                   string                  `json:"team,omitempty"`
+	CreatedBy              string                  `json:"created_by,omitempty"`
+	MemoryEnabled          bool                    `json:"memory_enabled,omitempty"`
+	MemorySearchAgentID    string                  `json:"memory_search_agent_id,omitempty"`
+	MemoryIngestAgentID    string                  `json:"memory_ingest_agent_id,omitempty"`
+	ToolOverrides          json.RawMessage         `json:"tool_overrides,omitempty"`
+	ModelParams            json.RawMessage         `json:"model_params,omitempty"`
+	PreInferenceProcessors []PreInferenceProcessor `json:"pre_inference_processors,omitempty"`
+	HandoffTo              string                  `json:"handoff_to,omitempty"`
+	Handoffs               []string                `json:"handoffs,omitempty"`
+}
+
+type PreInferenceProcessor struct {
+	ID        string          `json:"id,omitempty"`
+	Processor string          `json:"processor"`
+	Phase     string          `json:"phase"`
+	Config    json.RawMessage `json:"config"`
+	OnError   string          `json:"on_error,omitempty"`
+	Timeout   int             `json:"timeout,omitempty"`
 }
 
 type StructuredOutput struct {
