@@ -381,9 +381,9 @@ func TestHandler_Me_Authenticated(t *testing.T) {
 		IsAdmin:  true,
 	}
 
+	id := m.CreateSession(&sessionData{UserInfo: *ui, ExpiresAt: time.Now().Add(time.Hour)})
 	req := httptest.NewRequest(http.MethodGet, "/auth/me", nil)
-	ctx := ContextWithUserInfo(req.Context(), ui)
-	req = req.WithContext(ctx)
+	req.AddCookie(&http.Cookie{Name: "session", Value: id})
 	rec := httptest.NewRecorder()
 	h.me(rec, req)
 

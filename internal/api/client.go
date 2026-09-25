@@ -1,7 +1,6 @@
 package api
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -27,10 +26,6 @@ type Message struct {
 	Time    time.Time `json:"time"`
 }
 
-type RunAgentResponse struct {
-	RunID string `json:"run_id"`
-}
-
 type APIKeyInfo struct {
 	ID         string     `json:"id"`
 	Name       string     `json:"name"`
@@ -42,16 +37,16 @@ type APIKeyInfo struct {
 }
 
 type MCPServerInfo struct {
-	ID        string            `json:"id"`
-	Name      string            `json:"name"`
-	URL       string            `json:"url"`
-	Transport string            `json:"transport"`
-	Headers   map[string]string `json:"headers,omitempty"`
-	Scope     string            `json:"scope"`
-	Team      string            `json:"team,omitempty"`
-	CreatedBy string            `json:"created_by"`
-	CreatedAt string            `json:"created_at"`
-	UpdatedAt string            `json:"updated_at"`
+	ID            string            `json:"id"`
+	Name          string            `json:"name"`
+	URL           string            `json:"url"`
+	Transport     string            `json:"transport"`
+	Headers       map[string]string `json:"headers,omitempty"`
+	Scope         string            `json:"scope"`
+	Team          string            `json:"team,omitempty"`
+	CreatedBy     string            `json:"created_by"`
+	CreatedAt     string            `json:"created_at"`
+	UpdatedAt     string            `json:"updated_at"`
 	Connected     bool              `json:"connected"`
 	Tools         []MCPServerTool   `json:"tools"`
 	ToolOverrides json.RawMessage   `json:"tool_overrides,omitempty"`
@@ -77,34 +72,6 @@ type CreateMCPServerRequest struct {
 type SetToolScopeRequest struct {
 	Scope string `json:"scope"`
 	Team  string `json:"team,omitempty"`
-}
-
-type ProviderInfo struct {
-	ID               string            `json:"id"`
-	Name             string            `json:"name"`
-	ProviderType     string            `json:"provider_type"`
-	BaseURL          string            `json:"base_url"`
-	APIKey           string            `json:"api_key,omitempty"`
-	DefaultModel     string            `json:"default_model"`
-	SchemaValidation bool              `json:"schema_validation"`
-	Headers          map[string]string `json:"headers,omitempty"`
-	Scope            string            `json:"scope"`
-	Team             string            `json:"team,omitempty"`
-	CreatedBy        string            `json:"created_by"`
-	CreatedAt        string            `json:"created_at"`
-	UpdatedAt        string            `json:"updated_at"`
-}
-
-type CreateProviderRequest struct {
-	Name             string            `json:"name"`
-	ProviderType     string            `json:"provider_type"`
-	BaseURL          string            `json:"base_url"`
-	APIKey           string            `json:"api_key"`
-	DefaultModel     string            `json:"default_model"`
-	SchemaValidation bool              `json:"schema_validation"`
-	Headers          map[string]string `json:"headers,omitempty"`
-	Scope            string            `json:"scope"`
-	Team             string            `json:"team,omitempty"`
 }
 
 type TokenProvider interface {
@@ -277,25 +244,6 @@ func (c *Client) ListVersions(ctx context.Context, name string) (*VersionsRespon
 	return &versions, nil
 }
 
-func (c *Client) GetVersion(ctx context.Context, name, versionID string) (json.RawMessage, error) {
-	u := c.baseURL.JoinPath("/api/v1/agents/" + url.PathEscape(name) + "/version")
-	u.RawQuery = "version_id=" + url.QueryEscape(versionID)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-	c.withAuth(req)
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	var raw json.RawMessage
-	if err := c.decodeJSON(resp, &raw); err != nil {
-		return nil, err
-	}
-	return raw, nil
-}
-
 func (c *Client) Rollback(ctx context.Context, name, versionID string) (*Definition, error) {
 	u := c.baseURL.JoinPath("/api/v1/agents/" + url.PathEscape(name) + "/rollback")
 	u.RawQuery = "version_id=" + url.QueryEscape(versionID)
@@ -351,22 +299,6 @@ func (c *Client) ListSessions(ctx context.Context) ([]*Session, error) {
 	return sessions, nil
 }
 
-func (c *Client) RunAgent(ctx context.Context, agentID, message, sessionID string) (*RunAgentResponse, error) {
-	body := map[string]string{"message": message}
-	if sessionID != "" {
-		body["session_id"] = sessionID
-	}
-	resp, err := c.postJSON(ctx, "/api/v1/agents/"+url.PathEscape(agentID)+"/run", body)
-	if err != nil {
-		return nil, err
-	}
-	var result RunAgentResponse
-	if err := c.decodeJSON(resp, &result); err != nil {
-		return nil, err
-	}
-	return &result, nil
-}
-
 func (c *Client) StreamRunEvents(ctx context.Context, runID string) (*http.Response, error) {
 	u := c.baseURL.JoinPath("/api/v1/runs/" + url.PathEscape(runID) + "/events")
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
@@ -389,80 +321,6 @@ func (c *Client) StreamRunEventsReader(ctx context.Context, runID string) (io.Re
 		return nil, fmt.Errorf("SSE stream: %s: %s", resp.Status, string(body))
 	}
 	return resp.Body, nil
-}
-
-type SSEEvent struct {
-	Type string
-	Data string
-}
-
-func (c *Client) StreamRunEventsChan(ctx context.Context, runID string) (<-chan SSEEvent, error) {
-	resp, err := c.StreamRunEvents(ctx, runID)
-	if err != nil {
-		return nil, err
-	}
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
-		return nil, fmt.Errorf("SSE stream: %s: %s", resp.Status, string(body))
-	}
-
-	ch := make(chan SSEEvent, 64)
-	go func() {
-		defer resp.Body.Close()
-		defer close(ch)
-		scanner := bufio.NewScanner(resp.Body)
-		scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
-		var eventType string
-		for scanner.Scan() {
-			line := scanner.Text()
-			if line == "" {
-				eventType = ""
-				continue
-			}
-			if len(line) > 6 && line[:6] == "event:" {
-				eventType = line[6:]
-				for len(eventType) > 0 && eventType[0] == ' ' {
-					eventType = eventType[1:]
-				}
-				continue
-			}
-			if len(line) > 5 && line[:5] == "data:" {
-				data := line[5:]
-				for len(data) > 0 && data[0] == ' ' {
-					data = data[1:]
-				}
-				for scanner.Scan() {
-					next := scanner.Text()
-					if next == "" {
-						break
-					}
-					if len(next) > 5 && next[:5] == "data:" {
-						more := next[5:]
-						for len(more) > 0 && more[0] == ' ' {
-							more = more[1:]
-						}
-						data += "\n" + more
-					} else {
-						if len(next) > 6 && next[:6] == "event:" {
-							newType := next[6:]
-							for len(newType) > 0 && newType[0] == ' ' {
-								newType = newType[1:]
-							}
-							ch <- SSEEvent{Type: eventType, Data: data}
-							eventType = newType
-						}
-						continue
-					}
-				}
-				if data != "" {
-					ch <- SSEEvent{Type: eventType, Data: data}
-				}
-			}
-		}
-	}()
-
-	return ch, nil
 }
 
 func (c *Client) CreateAPIKey(ctx context.Context, name string) (*APIKeyInfo, error) {
@@ -581,66 +439,6 @@ func (c *Client) RefreshMCPServer(ctx context.Context, id string) error {
 	resp.Body.Close()
 	if resp.StatusCode >= 400 {
 		return fmt.Errorf("refresh mcp server: %s", resp.Status)
-	}
-	return nil
-}
-
-func (c *Client) ListProviders(ctx context.Context) ([]ProviderInfo, error) {
-	resp, err := c.get(ctx, "/api/v1/providers")
-	if err != nil {
-		return nil, err
-	}
-	var providers []ProviderInfo
-	if err := c.decodeJSON(resp, &providers); err != nil {
-		return nil, err
-	}
-	return providers, nil
-}
-
-func (c *Client) CreateProvider(ctx context.Context, req CreateProviderRequest) (*ProviderInfo, error) {
-	resp, err := c.postJSON(ctx, "/api/v1/providers", req)
-	if err != nil {
-		return nil, err
-	}
-	var provider ProviderInfo
-	if err := c.decodeJSON(resp, &provider); err != nil {
-		return nil, err
-	}
-	return &provider, nil
-}
-
-func (c *Client) GetProvider(ctx context.Context, name string) (*ProviderInfo, error) {
-	resp, err := c.get(ctx, "/api/v1/providers/"+url.PathEscape(name))
-	if err != nil {
-		return nil, err
-	}
-	var provider ProviderInfo
-	if err := c.decodeJSON(resp, &provider); err != nil {
-		return nil, err
-	}
-	return &provider, nil
-}
-
-func (c *Client) UpdateProvider(ctx context.Context, id string, req CreateProviderRequest) (*ProviderInfo, error) {
-	resp, err := c.putJSON(ctx, "/api/v1/providers/"+url.PathEscape(id), req)
-	if err != nil {
-		return nil, err
-	}
-	var provider ProviderInfo
-	if err := c.decodeJSON(resp, &provider); err != nil {
-		return nil, err
-	}
-	return &provider, nil
-}
-
-func (c *Client) DeleteProvider(ctx context.Context, id string) error {
-	resp, err := c.delete(ctx, "/api/v1/providers/"+url.PathEscape(id))
-	if err != nil {
-		return err
-	}
-	resp.Body.Close()
-	if resp.StatusCode >= 400 && resp.StatusCode != 404 {
-		return fmt.Errorf("delete provider: %s", resp.Status)
 	}
 	return nil
 }

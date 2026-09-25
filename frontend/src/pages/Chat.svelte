@@ -2,7 +2,12 @@
   import { api } from '../lib/api.js'
   import { navigate } from '../lib/stores.js'
   import { marked } from 'marked'
+  import DOMPurify from 'dompurify'
   marked.setOptions({ gfm: true, breaks: true })
+
+  function renderMarkdown(text) {
+    return DOMPurify.sanitize(marked.parse(text || ''))
+  }
 
   let agents = $state([])
   let sessions = $state([])
@@ -58,7 +63,7 @@
       const full = await api.get('/api/v1/chat/sessions/' + session.id)
       messages = (full.messages || []).map(msg => {
         if (msg.role === 'assistant') {
-          return { ...msg, content: marked.parse(msg.content) }
+          return { ...msg, content: renderMarkdown(msg.content) }
         }
         return msg
       })
@@ -129,12 +134,12 @@
         streamBubbles = ['']
       }
       try {
-        const html = marked.parse(streamingRaw)
+        const html = renderMarkdown(streamingRaw)
         console.log('[stream] token:', JSON.stringify(e.data), '| raw:', streamingRaw.length, 'chars | html:', html.length, 'chars | bubble:', streamBubbles.length)
         streamBubbles[streamBubbles.length - 1] = html
       } catch (err) {
         console.error('[stream] marked.parse threw:', err)
-        streamBubbles[streamBubbles.length - 1] = streamingRaw
+        streamBubbles[streamBubbles.length - 1] = DOMPurify.sanitize(streamingRaw)
       }
       scrollDown()
     })
@@ -175,7 +180,7 @@
   function finalizeStream(mdText) {
     streamingStatus = ''
     if (streamBubbles.length > 0) {
-      streamBubbles[streamBubbles.length - 1] = marked.parse(mdText || '')
+      streamBubbles[streamBubbles.length - 1] = renderMarkdown(mdText)
       for (let i = 0; i < streamBubbles.length; i++) {
         messages = [...messages, { role: 'assistant', content: streamBubbles[i] }]
       }

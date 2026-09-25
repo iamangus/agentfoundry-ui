@@ -139,6 +139,7 @@
 </script>
 
 {#if editingAgent}
+  {#key editingAgent}
   <AgentForm
     def={editingAgent}
     isNew={creatingNew}
@@ -148,6 +149,7 @@
     providers={formProviders}
     agents={agentList}
   />
+  {/key}
 {:else}
   <div class="agents-page">
     <div class="page-header">
@@ -223,8 +225,9 @@
       {/if}
     {/if}
     {#if showVersions}
-      <div class="modal-overlay" onclick={closeVersions}>
-        <div class="version-modal" onclick={(e) => e.stopPropagation()}>
+      <div class="modal-overlay">
+        <button class="modal-dismiss" onclick={closeVersions} aria-label="Close revisions"></button>
+        <div class="version-modal" role="dialog" aria-modal="true" aria-label="Agent revisions" tabindex="-1" onkeydown={(e) => { if (e.key === 'Escape') closeVersions() }}>
           <div class="version-modal-header">
             <h3>Revisions — {showVersions}</h3>
             <button class="action-btn" onclick={closeVersions} title="Close">
@@ -371,13 +374,22 @@
   .modal-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0,0,0,0.5);
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 100;
   }
+  .modal-dismiss {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    border: 0;
+    cursor: default;
+  }
   .version-modal {
+    position: relative;
     background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: 12px;

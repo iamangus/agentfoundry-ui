@@ -4,39 +4,41 @@
 
   let { def, isNew = false, onsave, oncancel, servers = [], providers = [], agents = [] } = $props()
 
-  let name = $state(def.name || '')
-  let description = $state(def.description || '')
-  let model = $state(def.model || '')
-  let systemPrompt = $state(def.system_prompt || '')
-  let maxTurns = $state(def.max_turns || 0)
-  let maxConcurrentTools = $state(def.max_concurrent_tools || 0)
-  let forceJson = $state(def.force_json || false)
-  let scope = $state(def.scope || 'user')
-  let team = $state(def.team || '')
-  let soEnabled = $state(!!(def.structured_output))
-  let soJSON = $state(def.structured_output ? JSON.stringify(def.structured_output, null, 2) : '')
+  function initial() { return { def, servers, providers, agents } }
 
-  let availableServers = $state(servers)
-  let availableAgents = $state((agents || []).filter(a => a.name !== def.name))
-  let availableProviders = $state(providers || [])
+  let name = $state(initial().def.name || '')
+  let description = $state(initial().def.description || '')
+  let model = $state(initial().def.model || '')
+  let systemPrompt = $state(initial().def.system_prompt || '')
+  let maxTurns = $state(initial().def.max_turns || 0)
+  let maxConcurrentTools = $state(initial().def.max_concurrent_tools || 0)
+  let forceJson = $state(initial().def.force_json || false)
+  let scope = $state(initial().def.scope || 'user')
+  let team = $state(initial().def.team || '')
+  let soEnabled = $state(!!initial().def.structured_output)
+  let soJSON = $state(initial().def.structured_output ? JSON.stringify(initial().def.structured_output, null, 2) : '')
+
+  let availableServers = $state(initial().servers)
+  let availableAgents = $state((initial().agents || []).filter(a => a.name !== initial().def.name))
+  let availableProviders = $state(initial().providers || [])
   let loading = $state(false)
-  let providerID = $state(def.provider_id || '')
+  let providerID = $state(initial().def.provider_id || '')
   let modelCapsPromise = $state(Promise.resolve(null))
-  let modelParams = $state(def.model_params ? (typeof def.model_params === 'string' ? JSON.parse(def.model_params) : def.model_params) : {})
+  let modelParams = $state(initial().def.model_params ? (typeof initial().def.model_params === 'string' ? JSON.parse(initial().def.model_params) : initial().def.model_params) : {})
 let modelParamsExpanded = $state(false)
 	let customParamsRaw = $state('')
 	let customParamsDirty = $state(false)
 	let fetchVersion = 0
-  let memoryEnabled = $state(def.memory_enabled || false)
-  let memorySearchAgentID = $state(def.memory_search_agent_id || '')
-  let memoryIngestAgentID = $state(def.memory_ingest_agent_id || '')
+  let memoryEnabled = $state(initial().def.memory_enabled || false)
+  let memorySearchAgentID = $state(initial().def.memory_search_agent_id || '')
+  let memoryIngestAgentID = $state(initial().def.memory_ingest_agent_id || '')
   let enabledTools = $state({})
   let selectedServers = $state([])
   let expandedServer = $state(null)
   let subAgents = $state([])
-  let handoffTo = $state(def.handoff_to || '')
-  let handoffs = $state(def.handoffs ? [...def.handoffs] : [])
-	let preInferenceProcessors = $state((def.pre_inference_processors || []).map((processor) => ({
+  let handoffTo = $state(initial().def.handoff_to || '')
+  let handoffs = $state(initial().def.handoffs ? [...initial().def.handoffs] : [])
+ let preInferenceProcessors = $state((initial().def.pre_inference_processors || []).map((processor) => ({
 		...processor,
 		configText: JSON.stringify(processor.config || {}, null, 2),
 	})))
@@ -430,23 +432,23 @@ let modelParamsExpanded = $state(false)
 
   <div class="form-body">
     <div class="form-group">
-      <label class="form-label">Name</label>
-      <input value={name} oninput={(e) => name = e.target.value} class="sb-input" placeholder="Agent name" />
+      <label class="form-label" for="agent-name">Name</label>
+      <input id="agent-name" value={name} oninput={(e) => name = e.target.value} class="sb-input" placeholder="Agent name" />
     </div>
 
     <div class="form-group">
-      <label class="form-label">Description</label>
-      <input value={description} oninput={(e) => description = e.target.value} class="sb-input" placeholder="Brief description" />
+      <label class="form-label" for="agent-description">Description</label>
+      <input id="agent-description" value={description} oninput={(e) => description = e.target.value} class="sb-input" placeholder="Brief description" />
     </div>
 
     <div class="form-group">
-      <label class="form-label">Model</label>
-      <input value={model} oninput={(e) => model = e.target.value} class="sb-input" placeholder="e.g. gpt-4o" />
+      <label class="form-label" for="agent-model">Model</label>
+      <input id="agent-model" value={model} oninput={(e) => model = e.target.value} class="sb-input" placeholder="e.g. gpt-4o" />
     </div>
 
     <div class="form-group">
-      <label class="form-label">Inference Provider</label>
-      <select value={providerID} onchange={(e) => providerID = e.target.value} class="sb-input">
+      <label class="form-label" for="agent-provider">Inference Provider</label>
+      <select id="agent-provider" value={providerID} onchange={(e) => providerID = e.target.value} class="sb-input">
         <option value="">-- none --</option>
         {#each availableProviders as p}
           <option value={p.id}>{p.name} ({p.provider_type})</option>
@@ -458,7 +460,7 @@ let modelParamsExpanded = $state(false)
       <div class="form-group">
         <div class="params-header">
           <span class="params-spinner"></span>
-          <label class="form-label" style="margin-bottom:0;">Model Parameters</label>
+          <span class="form-label" style="margin-bottom:0;">Model Parameters</span>
         </div>
       </div>
     {:then caps}
@@ -466,7 +468,7 @@ let modelParamsExpanded = $state(false)
         <div class="form-group">
           <div class="params-header" onclick={() => modelParamsExpanded = !modelParamsExpanded} role="button" tabindex="0" onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); modelParamsExpanded = !modelParamsExpanded } }}>
             <span class="params-arrow" class:expanded={modelParamsExpanded}>{modelParamsExpanded ? '▾' : '▸'}</span>
-            <label class="form-label" style="margin-bottom:0; cursor:pointer;">Model Parameters</label>
+            <span class="form-label" style="margin-bottom:0; cursor:pointer;">Model Parameters</span>
           </div>
           {#if modelParamsExpanded}
             <div class="params-card">
@@ -573,8 +575,8 @@ let modelParamsExpanded = $state(false)
     {/await}
 
     <div class="form-group">
-      <label class="form-label">System Prompt</label>
-      <textarea value={systemPrompt} oninput={(e) => systemPrompt = e.target.value} class="sb-input form-textarea" placeholder="System prompt..." rows="6"></textarea>
+      <label class="form-label" for="agent-system-prompt">System Prompt</label>
+      <textarea id="agent-system-prompt" value={systemPrompt} oninput={(e) => systemPrompt = e.target.value} class="sb-input form-textarea" placeholder="System prompt..." rows="6"></textarea>
     </div>
 
 		<div class="form-group">
@@ -639,7 +641,7 @@ let modelParamsExpanded = $state(false)
 
     <div class="form-group">
       <div class="tool-section-header">
-        <label class="form-label" style="margin-bottom:0;">Tools & Sub-agents</label>
+        <span class="form-label" style="margin-bottom:0;">Tools & Sub-agents</span>
         {#if totalEnabledCount() > 0}
           <span class="tool-count-badge">{totalEnabledCount()} enabled</span>
         {/if}
@@ -822,19 +824,19 @@ let modelParamsExpanded = $state(false)
 
     <div class="form-row">
       <div class="form-group">
-        <label class="form-label">Max Turns</label>
-        <input value={maxTurns} oninput={(e) => maxTurns = e.target.valueAsNumber || 0} type="number" class="sb-input" placeholder="0 = unlimited" />
+        <label class="form-label" for="agent-max-turns">Max Turns</label>
+        <input id="agent-max-turns" value={maxTurns} oninput={(e) => maxTurns = e.target.valueAsNumber || 0} type="number" class="sb-input" placeholder="0 = unlimited" />
       </div>
       <div class="form-group">
-        <label class="form-label">Max Concurrent Tools</label>
-        <input value={maxConcurrentTools} oninput={(e) => maxConcurrentTools = e.target.valueAsNumber || 0} type="number" class="sb-input" placeholder="0 = unlimited" />
+        <label class="form-label" for="agent-max-concurrent-tools">Max Concurrent Tools</label>
+        <input id="agent-max-concurrent-tools" value={maxConcurrentTools} oninput={(e) => maxConcurrentTools = e.target.valueAsNumber || 0} type="number" class="sb-input" placeholder="0 = unlimited" />
       </div>
     </div>
 
     <div class="form-row">
       <div class="form-group">
-        <label class="form-label">Scope</label>
-        <select value={scope} onchange={(e) => scope = e.target.value} class="sb-input">
+        <label class="form-label" for="agent-scope">Scope</label>
+        <select id="agent-scope" value={scope} onchange={(e) => scope = e.target.value} class="sb-input">
           <option value="user">personal</option>
           <option value="team">team</option>
           <option value="global">global</option>
@@ -842,8 +844,8 @@ let modelParamsExpanded = $state(false)
       </div>
       {#if scope === 'team'}
         <div class="form-group">
-          <label class="form-label">Team</label>
-          <select value={team} onchange={(e) => team = e.target.value} class="sb-input">
+          <label class="form-label" for="agent-team">Team</label>
+          <select id="agent-team" value={team} onchange={(e) => team = e.target.value} class="sb-input">
             <option value="">-- select team --</option>
             {#each $teams as t}
               <option value={t}>{t}</option>
@@ -875,15 +877,15 @@ let modelParamsExpanded = $state(false)
       <div class="tool-section-label">Handoffs</div>
       <p class="tool-hint" style="margin-bottom:12px;">Deterministic handoff routes the agent to another agent when it would return its final response. LLM-invoked handoffs expose <code>handoff_to_&lt;agent&gt;</code> tools the model can call mid-conversation to transfer control.</p>
 
-      <label class="form-label" style="margin-bottom:4px;">Deterministic handoff target</label>
-      <select class="sb-input tool-server-select" value={handoffTo} onchange={(e) => handoffTo = e.target.value}>
+      <label class="form-label" for="agent-handoff-target" style="margin-bottom:4px;">Deterministic handoff target</label>
+      <select id="agent-handoff-target" class="sb-input tool-server-select" value={handoffTo} onchange={(e) => handoffTo = e.target.value}>
         <option value="">None (no deterministic handoff)</option>
         {#each availableAgents as a}
           <option value={a.name} disabled={handoffs.includes(a.name)}>{a.name}{handoffs.includes(a.name) ? ' (in handoffs list)' : ''}</option>
         {/each}
       </select>
 
-      <label class="form-label" style="margin-top:16px; margin-bottom:4px;">LLM-invoked handoffs</label>
+      <span class="form-label" style="margin-top:16px; margin-bottom:4px;">LLM-invoked handoffs</span>
       {#if availableHandoffOptions().length > 0}
         <div class="tool-add-row">
           <select class="sb-input tool-server-select" id="handoff-select">
@@ -927,12 +929,12 @@ let modelParamsExpanded = $state(false)
       {#if memoryEnabled}
         <div style="margin-top:10px; display:flex; flex-direction:column; gap:10px;">
           <div>
-            <label class="form-label" style="margin-bottom:4px;">Memory Search Agent ID</label>
-            <input value={memorySearchAgentID} oninput={(e) => memorySearchAgentID = e.target.value} class="sb-input" placeholder="UUID of the memory search agent" />
+            <label class="form-label" for="agent-memory-search" style="margin-bottom:4px;">Memory Search Agent ID</label>
+            <input id="agent-memory-search" value={memorySearchAgentID} oninput={(e) => memorySearchAgentID = e.target.value} class="sb-input" placeholder="UUID of the memory search agent" />
           </div>
           <div>
-            <label class="form-label" style="margin-bottom:4px;">Memory Ingest Agent ID</label>
-            <input value={memoryIngestAgentID} oninput={(e) => memoryIngestAgentID = e.target.value} class="sb-input" placeholder="UUID of the memory ingest agent" />
+            <label class="form-label" for="agent-memory-ingest" style="margin-bottom:4px;">Memory Ingest Agent ID</label>
+            <input id="agent-memory-ingest" value={memoryIngestAgentID} oninput={(e) => memoryIngestAgentID = e.target.value} class="sb-input" placeholder="UUID of the memory ingest agent" />
           </div>
         </div>
       {/if}

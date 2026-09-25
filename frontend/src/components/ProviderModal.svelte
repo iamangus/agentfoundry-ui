@@ -114,19 +114,20 @@
   }
 </script>
 
-<div class="modal-backdrop" onclick={close} onkeydown={onkeydown}>
-  <div class="modal-card" onclick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" tabindex="-1">
+<div class="modal-backdrop">
+  <button class="modal-dismiss" onclick={close} aria-label="Close provider form"></button>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-label="Inference provider" tabindex="-1" onkeydown={onkeydown}>
     <h3 class="modal-title">{isEdit ? 'Edit Provider' : 'Add Inference Provider'}</h3>
 
     {#if error}
       <div class="form-error">{error}</div>
     {/if}
 
-    <label class="modal-label">Name</label>
-    <input class="sb-input" bind:value={formName} placeholder="my-provider" />
+    <label class="modal-label" for="provider-name">Name</label>
+    <input id="provider-name" class="sb-input" bind:value={formName} placeholder="my-provider" />
 
-    <label class="modal-label">Provider Type</label>
-    <select class="sb-input" bind:value={formProviderType}>
+    <label class="modal-label" for="provider-type">Provider Type</label>
+    <select id="provider-type" class="sb-input" bind:value={formProviderType}>
       <option value="openai">OpenAI</option>
       <option value="anthropic">Anthropic</option>
       <option value="openrouter">OpenRouter</option>
@@ -135,33 +136,33 @@
       <option value="custom">Custom</option>
     </select>
 
-    <label class="modal-label">Base URL</label>
-    <input class="sb-input" bind:value={formBaseURL} placeholder="https://api.openai.com/v1" />
+    <label class="modal-label" for="provider-base-url">Base URL</label>
+    <input id="provider-base-url" class="sb-input" bind:value={formBaseURL} placeholder="https://api.openai.com/v1" />
 
-    <label class="modal-label">API Key</label>
-    <input class="sb-input" bind:value={formAPIKey} placeholder={isEdit ? '(unchanged)' : 'sk-...'} type="password" />
+    <label class="modal-label" for="provider-api-key">API Key</label>
+    <input id="provider-api-key" class="sb-input" bind:value={formAPIKey} placeholder={isEdit ? '(unchanged)' : 'sk-...'} type="password" />
 
-    <label class="modal-label">Default Model</label>
-    <input class="sb-input" bind:value={formDefaultModel} placeholder="gpt-4o" />
+    <label class="modal-label" for="provider-default-model">Default Model</label>
+    <input id="provider-default-model" class="sb-input" bind:value={formDefaultModel} placeholder="gpt-4o" />
 
     <label class="modal-label" style="display:flex;align-items:center;gap:8px;cursor:pointer;">
       <input type="checkbox" bind:checked={formSchemaValidation} style="width:14px;height:14px;" />
       Schema Validation
     </label>
 
-    <label class="modal-label">Headers (one <code>Key: Value</code> per line)</label>
-    <textarea class="sb-input sb-textarea" bind:value={formHeaders} placeholder="X-Custom-Header: value" rows="3"></textarea>
+    <label class="modal-label" for="provider-headers">Headers (one <code>Key: Value</code> per line)</label>
+    <textarea id="provider-headers" class="sb-input sb-textarea" bind:value={formHeaders} placeholder="X-Custom-Header: value" rows="3"></textarea>
 
-    <label class="modal-label">Scope</label>
-    <select class="sb-input" bind:value={formScope}>
+    <label class="modal-label" for="provider-scope">Scope</label>
+    <select id="provider-scope" class="sb-input" bind:value={formScope}>
       <option value="user">Personal</option>
       <option value="team">Team</option>
       <option value="global">Global</option>
     </select>
 
     {#if formScope === 'team'}
-      <label class="modal-label">Team name</label>
-      <select class="sb-input" bind:value={formTeam}>
+      <label class="modal-label" for="provider-team">Team name</label>
+      <select id="provider-team" class="sb-input" bind:value={formTeam}>
         <option value="">-- select team --</option>
         {#each $teams as t}
           <option value={t}>{t}</option>
@@ -182,13 +183,22 @@
   .modal-backdrop {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.55);
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 100;
   }
+  .modal-dismiss {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.55);
+    border: 0;
+    cursor: default;
+  }
   .modal-card {
+    position: relative;
     background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: 12px;

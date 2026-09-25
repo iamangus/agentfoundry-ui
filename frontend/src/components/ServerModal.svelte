@@ -165,31 +165,31 @@
       <div class="form-error">{error}</div>
     {/if}
 
-    <label class="modal-label">Name</label>
-    <input class="sb-input" bind:value={formName} placeholder="my-mcp-server" />
+    <label class="modal-label" for="server-name">Name</label>
+    <input id="server-name" class="sb-input" bind:value={formName} placeholder="my-mcp-server" />
 
-    <label class="modal-label">URL</label>
-    <input class="sb-input" bind:value={formUrl} placeholder="http://localhost:8080/sse" />
+    <label class="modal-label" for="server-url">URL</label>
+    <input id="server-url" class="sb-input" bind:value={formUrl} placeholder="http://localhost:8080/sse" />
 
-    <label class="modal-label">Transport</label>
-    <select class="sb-input" bind:value={formTransport}>
+    <label class="modal-label" for="server-transport">Transport</label>
+    <select id="server-transport" class="sb-input" bind:value={formTransport}>
       <option value="sse">SSE</option>
       <option value="streamable-http">Streamable HTTP</option>
     </select>
 
-    <label class="modal-label">Headers (one <code>Key: Value</code> per line)</label>
-    <textarea class="sb-input sb-textarea" bind:value={formHeaders} placeholder="X-API-Key: your-key" rows="3"></textarea>
+    <label class="modal-label" for="server-headers">Headers (one <code>Key: Value</code> per line)</label>
+    <textarea id="server-headers" class="sb-input sb-textarea" bind:value={formHeaders} placeholder="X-API-Key: your-key" rows="3"></textarea>
 
-    <label class="modal-label">Scope</label>
-    <select class="sb-input" bind:value={formScope}>
+    <label class="modal-label" for="server-scope">Scope</label>
+    <select id="server-scope" class="sb-input" bind:value={formScope}>
       <option value="user">Personal</option>
       <option value="team">Team</option>
       <option value="global">Global</option>
     </select>
 
     {#if formScope === 'team'}
-      <label class="modal-label">Team name</label>
-      <select class="sb-input" bind:value={formTeam}>
+      <label class="modal-label" for="server-team">Team name</label>
+      <select id="server-team" class="sb-input" bind:value={formTeam}>
         <option value="">-- select team --</option>
         {#each $teams as t}
           <option value={t}>{t}</option>
@@ -197,7 +197,7 @@
       </select>
     {/if}
 
-    <label class="modal-label">Tool Parameter Overrides</label>
+    <span class="modal-label">Tool Parameter Overrides</span>
     <p class="modal-hint">Override input values for tool parameters. Use <code>*</code> to target all tools, or a specific tool name. Value supports <code>$&#123;agentID&#125;</code>, <code>$&#123;agentName&#125;</code>, <code>$&#123;userSubject&#125;</code>.</p>
     {#each getOverrideKeys() as target}
       <div class="override-group">
