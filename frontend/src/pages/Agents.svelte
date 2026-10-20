@@ -1,9 +1,15 @@
 <script>
   import { api } from '../lib/api.js'
   import AgentForm from './AgentForm.svelte'
+  import { notify, confirmAction } from '../lib/feedback.js'
+  import { dialogFocus } from '../lib/dialog.js'
 
   let agents = $state([])
-  let groups = $state({ personal: [], team: [], global: [] })
+  let search = $state('')
+  let scopeFilter = $state('')
+  let loadError = $state('')
+  const filtered = $derived(agents.filter(a => (!scopeFilter || (a.scope || 'user') === scopeFilter) && `${a.name} ${a.description || ''} ${a.model || ''}`.toLowerCase().includes(search.toLowerCase())))
+  const groups = $derived(groupByScope(filtered))
   let loading = $state(true)
   let editingAgent = $state(null)
   let creatingNew = $state(false)
@@ -20,12 +26,13 @@
   })
 
   async function loadAgents() {
+    loadError = ''
     try {
       agents = await api.get('/agents/list')
-      groups = groupByScope(agents)
       agentList = agents || []
     } catch (e) {
       console.error('Failed to load agents', e)
+      loadError = 'Could not load agents. ' + e.message
     } finally {
       loading = false
     }
@@ -41,6 +48,7 @@
       formProviders = providers || []
     } catch (e) {
       console.error('Failed to load form data', e)
+      notify('Could not load agent configuration options: ' + e.message)
     }
   }
 
@@ -82,7 +90,7 @@
       await loadAgents()
     } catch (e) {
       console.error('Failed to save agent', e)
-      alert('Failed to save: ' + e.message)
+      throw e
     }
   }
 
@@ -92,17 +100,18 @@
       await loadAgents()
     } catch (e) {
       console.error('Failed to clone agent', e)
-      alert('Failed to clone: ' + e.message)
+      notify('Could not clone agent: ' + e.message)
     }
   }
 
   async function deleteAgent(name) {
-    if (!confirm('Delete agent "' + name + '"?')) return
+    if (!await confirmAction('Delete agent "' + name + '"? This cannot be undone.', { title: 'Delete agent?', label: 'Delete agent' })) return
     try {
       await api.del('/agents/' + encodeURIComponent(name))
       await loadAgents()
     } catch (e) {
       console.error('Failed to delete agent', e)
+      notify('Could not delete agent: ' + e.message)
     }
   }
 
@@ -114,6 +123,7 @@
       versions = (resp.versions || []).sort((a, b) => new Date(b.last_modified) - new Date(a.last_modified))
     } catch (e) {
       console.error('Failed to load versions', e)
+      notify('Could not load revisions: ' + e.message)
       versions = []
     } finally {
       versionsLoading = false
@@ -126,14 +136,14 @@
   }
 
   async function rollbackVersion(agentName, versionId) {
-    if (!confirm('Restore this version? This will create a new save with this version\'s content.')) return
+    if (!await confirmAction('This creates a new revision using the selected version’s content.', { title: 'Restore revision?', label: 'Restore revision', destructive: false })) return
     try {
       await api.post('/agents/' + encodeURIComponent(agentName) + '/rollback?version_id=' + encodeURIComponent(versionId), null)
       await loadAgents()
       closeVersions()
     } catch (e) {
       console.error('Failed to rollback', e)
-      alert('Rollback failed: ' + e.message)
+      notify('Could not restore revision: ' + e.message)
     }
   }
 </script>
@@ -153,7 +163,7 @@
 {:else}
   <div class="agents-page">
     <div class="page-header">
-      <h2 class="page-title">Agents</h2>
+      <h1 class="page-title">Agents</h1>
       <button onclick={startCreate} class="sb-submit" style="width:auto;">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width:14px;height:14px;">
           <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
@@ -162,6 +172,13 @@
       </button>
     </div>
 
+    <p class="page-description">Build, configure, and reuse agents across your workspace.</p>
+    <div class="list-toolbar">
+      <input class="sb-input" type="search" aria-label="Search agents" placeholder="Search agents, descriptions, models…" bind:value={search} />
+      <select class="sb-input" aria-label="Filter agents by scope" bind:value={scopeFilter} style="width:auto;"><option value="">All scopes</option><option value="user">Personal</option><option value="team">Team</option><option value="global">Global</option></select>
+      <span class="result-count">{filtered.length} {filtered.length === 1 ? 'agent' : 'agents'}</span>
+    </div>
+    {#if loadError}<div class="inline-error" role="alert">{loadError} <button class="secondary-button" onclick={loadAgents}>Retry</button></div>{/if}
     {#if loading}
       <p style="color:var(--text-muted); padding:20px;">Loading...</p>
     {:else}
@@ -203,6 +220,7 @@
                   <div class="agent-meta">
                     {#if agent.agent_id}<span class="meta-tag id-tag" title="Agent ID for API runs">{agent.agent_id}</span>{/if}
                     {#if agent.model}<span class="meta-tag">model: {agent.model}</span>{/if}
+                    {#if agent.backup_provider_id}<span class="backup-badge">Backup configured</span>{/if}
                     {#if agent.tools && agent.tools.length > 0}<span class="meta-tag">{agent.tools.length} tools</span>{/if}
                   </div>
                 </div>
@@ -212,22 +230,22 @@
         {/if}
       {/each}
 
-      {#if Object.values(groups).every(g => g.length === 0)}
+      {#if !loadError && Object.values(groups).every(g => g.length === 0)}
         <div class="empty-state" style="padding-top:60px;">
           <div class="empty-icon">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
               <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
             </svg>
           </div>
-          <p class="empty-title">No agents</p>
-          <p class="empty-sub">Create your first agent to get started.</p>
+          <p class="empty-title">{agents.length ? 'No matching agents' : 'Your first agent starts here'}</p>
+          <p class="empty-sub">{agents.length ? 'Try another search or scope.' : 'Create an agent, choose a provider, and give it instructions.'}</p>
         </div>
       {/if}
     {/if}
     {#if showVersions}
       <div class="modal-overlay">
         <button class="modal-dismiss" onclick={closeVersions} aria-label="Close revisions"></button>
-        <div class="version-modal" role="dialog" aria-modal="true" aria-label="Agent revisions" tabindex="-1" onkeydown={(e) => { if (e.key === 'Escape') closeVersions() }}>
+        <div class="version-modal" role="dialog" aria-modal="true" aria-label="Agent revisions" tabindex="-1" use:dialogFocus onkeydown={(e) => { if (e.key === 'Escape') closeVersions() }}>
           <div class="version-modal-header">
             <h3>Revisions — {showVersions}</h3>
             <button class="action-btn" onclick={closeVersions} title="Close">

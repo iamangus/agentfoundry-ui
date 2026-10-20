@@ -495,6 +495,8 @@ func definitionFromJSON(r *http.Request) (*api.Definition, error) {
 		Scope                  string                      `json:"scope"`
 		Team                   string                      `json:"team"`
 		ProviderID             string                      `json:"provider_id"`
+		BackupProviderID       string                      `json:"backup_provider_id"`
+		BackupModel            string                      `json:"backup_model"`
 		StructuredOutput       *api.StructuredOutput       `json:"structured_output"`
 		MemoryEnabled          bool                        `json:"memory_enabled"`
 		MemorySearchAgentID    string                      `json:"memory_search_agent_id"`
@@ -522,6 +524,8 @@ func definitionFromJSON(r *http.Request) (*api.Definition, error) {
 		Scope:                  formData.Scope,
 		Team:                   formData.Team,
 		ProviderID:             formData.ProviderID,
+		BackupProviderID:       formData.BackupProviderID,
+		BackupModel:            formData.BackupModel,
 		StructuredOutput:       formData.StructuredOutput,
 		MemoryEnabled:          formData.MemoryEnabled,
 		MemorySearchAgentID:    formData.MemorySearchAgentID,

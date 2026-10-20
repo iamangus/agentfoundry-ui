@@ -1,6 +1,7 @@
 <script>
   import { api } from '../lib/api.js'
   import ServerModal from '../components/ServerModal.svelte'
+  import { notify, confirmAction } from '../lib/feedback.js'
 
   let mcpServers = $state([])
   let loading = $state(true)
@@ -9,6 +10,9 @@
   let expandedServer = $state(null)
   let serverLoading = $state(false)
   let refreshTimer = $state(null)
+  let search = $state('')
+  let loadError = $state('')
+  const filtered = $derived(mcpServers.filter(s => `${s.name} ${s.url} ${(s.tools || []).map(t => `${t.name} ${t.description || ''}`).join(' ')}`.toLowerCase().includes(search.toLowerCase())))
 
   $effect(() => {
     loadMCPServers()
@@ -19,10 +23,12 @@
 
   async function loadMCPServers() {
     loading = true
+    loadError = ''
     try {
       mcpServers = await api.get('/tools/servers/list')
     } catch (e) {
       console.error('Failed to load MCP servers', e)
+      loadError = 'Could not load tool servers. ' + e.message
     } finally {
       loading = false
     }
@@ -53,14 +59,14 @@
   }
 
   async function deleteServer(id) {
-    if (!confirm(`Delete MCP server "${mcpServers.find(s => s.id === id)?.name}"? This will disconnect it.`)) return
+    if (!await confirmAction(`Disconnect and delete "${mcpServers.find(s => s.id === id)?.name}"? Its tools will no longer be available to agents.`, { title: 'Delete tool server?', label: 'Delete server' })) return
     try {
       await api.del('/tools/servers/' + encodeURIComponent(id))
       if (expandedServer === id) expandedServer = null
       loadMCPServers()
     } catch (e) {
       console.error('Failed to delete server', e)
-      alert('Failed to delete: ' + e.message)
+      notify('Could not delete server: ' + e.message)
     }
   }
 
@@ -75,6 +81,7 @@
       }, 1500)
     } catch (e) {
       console.error('Failed to refresh', e)
+      notify('Could not refresh tools: ' + e.message)
     } finally {
       serverLoading = false
     }
@@ -86,6 +93,7 @@
       loadMCPServers()
     } catch (e) {
       console.error('Failed to set tool scope', e)
+      notify('Could not change tool scope: ' + e.message)
     }
   }
 
@@ -99,7 +107,7 @@
 <div class="tools-page">
   <div class="page-header">
     <div class="section-header">
-      <h3 class="section-title">MCP Servers</h3>
+      <h1 class="section-title">Tools</h1>
       <button onclick={openCreateModal} class="sb-submit" style="width:auto; padding:8px 18px; font-size:0.82rem;">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
           <path d="M12 5v14M5 12h14"/>
@@ -109,24 +117,28 @@
     </div>
   </div>
 
+  <p class="page-description">Connect MCP servers, discover their tools, and control who can use them.</p>
+  <div class="list-toolbar"><input class="sb-input" type="search" aria-label="Search servers and tools" placeholder="Search servers and tools…" bind:value={search} /><span class="result-count">{filtered.length} servers</span></div>
+  {#if loadError}<div class="inline-error" role="alert">{loadError} <button class="secondary-button" onclick={loadMCPServers}>Retry</button></div>{/if}
   {#if loading}
     <p style="color:var(--text-muted); padding:20px;">Loading...</p>
-  {:else if mcpServers.length === 0}
+  {:else if mcpServers.length === 0 && !loadError}
     <div class="empty-state">
       <p class="empty-title">No registered MCP servers</p>
       <p class="empty-desc">Register an MCP server to discover its tools. Tools can then be assigned to agents from the agent create/edit form.</p>
     </div>
   {:else}
     <div class="server-cards">
-      {#each mcpServers as srv}
+      {#each filtered as srv}
         <div class="server-card" class:expanded={expandedServer === srv.id}>
-          <div class="server-card-header" onclick={() => toggleExpand(srv.id)} onkeydown={(e) => { if (e.key === 'Enter') toggleExpand(srv.id) }} role="button" tabindex="0">
+          <div class="server-card-header" aria-expanded={expandedServer === srv.id} onclick={() => toggleExpand(srv.id)} onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleExpand(srv.id) } }} role="button" tabindex="0">
             <div class="server-card-main">
               <span class="server-name">{srv.name}</span>
               <span class="server-url">{srv.url}</span>
             </div>
             <div class="server-card-meta">
               <span class="status-dot" class:connected={srv.connected} class:disconnected={!srv.connected}></span>
+              <span class="result-count">{srv.connected ? 'Connected' : 'Disconnected'}</span>
               <span class="scope-badge scope-{scopeBadge(srv.scope)}">{scopeBadge(srv.scope)}</span>
               <span class="tool-count">{srv.tools.length} tools</span>
               <span class="expand-arrow">{expandedServer === srv.id ? '▾' : '▸'}</span>
@@ -157,7 +169,7 @@
                           <td class="tool-name-cell">{tool.name}</td>
                           <td class="tool-desc-cell">{tool.description || '—'}</td>
                           <td class="tool-scope-cell">
-                            <select class="scope-select" value={tool.scope} onchange={(e) => setToolScope(srv.id, tool.name, e.target.value)}>
+                            <select class="scope-select" aria-label={`Scope for ${tool.name}`} value={tool.scope} onchange={(e) => setToolScope(srv.id, tool.name, e.target.value)}>
                               <option value="user">personal</option>
                               <option value="team">team</option>
                               <option value="global">global</option>
@@ -180,6 +192,7 @@
           {/if}
         </div>
       {/each}
+      {#if !filtered.length && !loadError}<p class="empty-state">No servers or tools match “{search}”. Try another search.</p>{/if}
     </div>
   {/if}
 </div>

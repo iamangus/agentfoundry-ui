@@ -3,6 +3,7 @@
   import { navigate } from '../lib/stores.js'
   import { marked } from 'marked'
   import DOMPurify from 'dompurify'
+  import { notify } from '../lib/feedback.js'
   marked.setOptions({ gfm: true, breaks: true })
 
   function renderMarkdown(text) {
@@ -16,7 +17,11 @@
   let selectedAgent = $state('')
   let newMessage = $state('')
   let loading = $state(true)
-  let sidebarOpen = $state(true)
+  let sidebarOpen = $state(window.innerWidth > 760)
+  let search = $state('')
+  let error = $state('')
+  let sending = $state(false)
+  const filteredSessions = $derived(sessions.filter(s => `${s.agent_name} ${s.id}`.toLowerCase().includes(search.toLowerCase())))
   let messageListEl = $state(null)
 
   let streamBubbles = $state([])
@@ -33,6 +38,7 @@
   })
 
   async function loadData() {
+    error = ''
     try {
       const [a, s] = await Promise.all([
         api.get('/agents/list'),
@@ -51,16 +57,21 @@
       }
     } catch (e) {
       console.error('Failed to load chat data', e)
+      error = 'Could not load chats. ' + e.message
     } finally {
       loading = false
     }
   }
 
   async function selectSession(session) {
+    if (activeRunId && currentSession?.id !== session.id) return
     currentSession = session
+    messages = []
+    if (window.innerWidth <= 760) sidebarOpen = false
     navigate('/chat?session=' + session.id)
     try {
       const full = await api.get('/api/v1/chat/sessions/' + session.id)
+      sessions = sessions.map(s => s.id === session.id ? { ...s, messages: full.messages || [] } : s)
       messages = (full.messages || []).map(msg => {
         if (msg.role === 'assistant') {
           return { ...msg, content: renderMarkdown(msg.content) }
@@ -73,11 +84,12 @@
       }
     } catch (e) {
       console.error('Failed to load session', e)
+      notify('Could not open this conversation. ' + e.message)
     }
   }
 
   async function createSession() {
-    if (!selectedAgent) return
+    if (!selectedAgent || activeRunId) return
     try {
       const sess = await api.post('/api/v1/chat/sessions', { agent_id: selectedAgent })
       sessions = [sess, ...sessions]
@@ -85,14 +97,17 @@
       await loadData()
     } catch (e) {
       console.error('Failed to create session', e)
+      notify('Could not create a conversation. ' + e.message)
     }
   }
 
   async function sendMessage() {
-    if (!newMessage.trim() || !currentSession) return
+    if (!newMessage.trim() || !currentSession || sending) return
+    sending = true
     const content = newMessage
+    const clientID = crypto.randomUUID()
     newMessage = ''
-    messages = [...messages, { role: 'user', content }]
+    messages = [...messages, { role: 'user', content, clientID }]
     requestAnimationFrame(() => scrollDown())
 
     try {
@@ -100,6 +115,11 @@
       startStream(result.run_id)
     } catch (e) {
       console.error('Failed to send message', e)
+      messages = messages.filter(m => m.clientID !== clientID)
+      newMessage = content
+      notify('Could not send message. ' + e.message)
+    } finally {
+      sending = false
     }
   }
 
@@ -113,8 +133,21 @@
     const es = new EventSource('/runs/' + runId + '/events')
     eventSource = es
 
+    es.addEventListener('response_boundary', () => {
+      for (const content of streamBubbles) {
+        if (content?.trim()) messages = [...messages, { role: 'assistant', content }]
+      }
+      streamBubbles = []
+      streamingRaw = ''
+    })
+
+    es.addEventListener('response_retry', () => {
+      streamingRaw = ''
+      streamBubbles = []
+      streamingStatus = 'Retrying inference'
+    })
+
     es.addEventListener('response_start', () => {
-      console.log('[stream] response_start')
       if (streamBubbles.length > 0) {
         for (const bubble of streamBubbles) {
           if (bubble && bubble.trim()) {
@@ -135,7 +168,6 @@
       }
       try {
         const html = renderMarkdown(streamingRaw)
-        console.log('[stream] token:', JSON.stringify(e.data), '| raw:', streamingRaw.length, 'chars | html:', html.length, 'chars | bubble:', streamBubbles.length)
         streamBubbles[streamBubbles.length - 1] = html
       } catch (err) {
         console.error('[stream] marked.parse threw:', err)
@@ -145,12 +177,10 @@
     })
 
     es.addEventListener('status', (e) => {
-      console.log('[stream] status:', e.data)
       streamingStatus = e.data
     })
 
     es.addEventListener('done', (e) => {
-      console.log('[stream] done, mdText length:', (e.data || '').length)
       es.close()
       eventSource = null
       finalizeStream(e.data)
@@ -161,20 +191,19 @@
       es.close()
       eventSource = null
       if (e.data) {
-        finalizeStream(e.data)
+        notify('Agent run failed: ' + e.data)
+        streamingStatus = ''
+        streamBubbles = []
+        streamingRaw = ''
       } else {
         streamingStatus = ''
         streamBubbles = []
         streamingRaw = ''
+        notify('The live connection was interrupted. Reopen this chat to load saved messages.')
       }
       activeRunId = ''
     })
 
-    es.onerror = () => {
-      es.close()
-      eventSource = null
-      activeRunId = ''
-    }
   }
 
   function finalizeStream(mdText) {
@@ -197,19 +226,19 @@
   }
 
   function handleKeydown(e) {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
       e.preventDefault()
       sendMessage()
     }
   }
 </script>
 
-<aside class="sidebar" class:collapsed={!sidebarOpen}>
+<aside id="chat-sessions" class="sidebar" class:collapsed={!sidebarOpen} aria-label="Chat sessions">
   <div class="sidebar-inner">
     <div class="sidebar-section">
       <div class="sb-section-label">New Chat</div>
       <div style="display:flex; gap:6px; margin-top:6px;">
-        <select value={selectedAgent} onchange={(e) => selectedAgent = e.target.value} class="sb-input" style="flex:1;">
+        <select aria-label="Agent for new chat" value={selectedAgent} onchange={(e) => selectedAgent = e.target.value} class="sb-input" style="flex:1;">
           {#if agents.length === 0}
             <option disabled>No agents</option>
           {:else}
@@ -219,7 +248,7 @@
             {/each}
           {/if}
         </select>
-        <button onclick={createSession} disabled={!selectedAgent} class="sb-submit" style="width:auto; padding: 6px 12px;" aria-label="Create session">
+        <button onclick={createSession} disabled={!selectedAgent || !!activeRunId} class="sb-submit" style="width:auto; padding: 6px 12px;" aria-label="Create session">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width:14px;height:14px;">
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
           </svg>
@@ -228,15 +257,18 @@
     </div>
     <div class="sidebar-section" style="padding-top:0;">
       <div class="sb-section-label">Sessions</div>
+      <input class="sb-input" aria-label="Search chat sessions" type="search" placeholder="Find a conversation…" bind:value={search} />
     </div>
     <div class="session-list">
       {#if sessions.length === 0}
         <div class="session-empty">No chats yet</div>
       {:else}
-        {#each sessions as s}
+        {#each filteredSessions as s}
           <button
             class="session-row"
             class:active={currentSession?.id === s.id}
+            aria-current={currentSession?.id === s.id ? 'true' : undefined}
+            disabled={!!activeRunId && currentSession?.id !== s.id}
             onclick={() => selectSession(s)}
           >
             <span class="session-name">{s.agent_name}</span>
@@ -248,11 +280,13 @@
   </div>
 </aside>
 
-<main class="chat">
+<section class="chat" aria-label="Conversation">
+  {#if error}<div class="inline-error" role="alert">{error} <button class="secondary-button" onclick={loadData}>Retry</button></div>{/if}
+  {#if loading}<p class="field-help" role="status">Loading conversations…</p>{/if}
   {#if currentSession}
     <div class="chat-layout">
       <div class="chat-head">
-        <button class="sidebar-toggle-btn" onclick={() => sidebarOpen = !sidebarOpen} aria-label="Toggle sidebar">
+        <button class="sidebar-toggle-btn" onclick={() => sidebarOpen = !sidebarOpen} aria-label="Toggle chat sessions" aria-expanded={sidebarOpen} aria-controls="chat-sessions">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/>
           </svg>
@@ -289,7 +323,7 @@
 
         {#if streamingStatus}
           <div class="msg-row msg-left">
-            <div class="thinking-bubble">
+            <div class="thinking-bubble" role="status" aria-live="polite">
               <span class="thinking-label">{streamingStatus}</span>
               <div class="thinking-dot"></div>
               <div class="thinking-dot" style="animation-delay:0.2s"></div>
@@ -304,24 +338,26 @@
       <div class="chat-foot">
         <div class="input-wrap">
           <textarea
+            aria-label="Message agent"
             value={newMessage}
             onkeydown={handleKeydown}
             rows="1"
             placeholder="Message {currentSession.agent_name}..."
             oninput={(e) => { newMessage = e.target.value; e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 140) + 'px'; }}
           ></textarea>
-          <button onclick={sendMessage} class="send-btn" aria-label="Send" disabled={!currentSession}>
+          <button onclick={sendMessage} class="send-btn" aria-label="Send message" disabled={!currentSession || !newMessage.trim() || sending}>
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5" />
             </svg>
           </button>
         </div>
+        <p class="composer-help">Enter to send · Shift + Enter for a new line</p>
       </div>
     </div>
   {:else}
     <div class="chat-layout">
       <div class="chat-head">
-        <button class="sidebar-toggle-btn" onclick={() => sidebarOpen = !sidebarOpen} aria-label="Toggle sidebar">
+        <button class="sidebar-toggle-btn" onclick={() => sidebarOpen = !sidebarOpen} aria-label="Toggle chat sessions" aria-expanded={sidebarOpen} aria-controls="chat-sessions">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/>
           </svg>
@@ -333,12 +369,13 @@
             <path stroke-linecap="round" stroke-linejoin="round" d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
           </svg>
         </div>
-        <p class="empty-title">No chat selected</p>
-        <p class="empty-sub">Choose an agent and start a chat from the sidebar.</p>
+        <h1 class="empty-title">A workspace for your agents</h1>
+        <p class="empty-sub">Choose an agent to start a conversation, or pick up where you left off.</p>
+        <button class="secondary-button" style="margin-top:1rem" onclick={() => sidebarOpen = true}>Choose a conversation</button>
       </div>
     </div>
   {/if}
-</main>
+</section>
 
 <style>
   .sidebar {

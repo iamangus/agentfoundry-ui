@@ -7,9 +7,33 @@ Web frontend for [agentfoundry](https://github.com/angoo/agentfoundry). Provides
 ### Build and Run
 
 ```bash
+npm --prefix frontend ci
+npm --prefix frontend run build
 go build -o agentfoundry-ui ./cmd/server/
 BACKEND_URL=http://localhost:3000 ./agentfoundry-ui
 ```
+
+### UI verification
+
+The Svelte 5 frontend is embedded in the Go server; no Vite application server is required.
+
+```bash
+cd frontend
+npm ci
+npx playwright install chromium
+npm test
+```
+
+Playwright builds and starts the embedded Go server on `127.0.0.1:18081`.
+Tests use deterministic browser-side API fixtures, not production credentials.
+They cover all six screens, light/dark contrast with axe, narrow viewports,
+backup configuration, inline validation, dialogs, focus restoration, and run traces.
+
+The UI uses a shared semantic token layer in `frontend/src/app.css`.
+Agent settings include an optional backup provider/model. Two transient primary
+failures switch that run to its backup; the backup uses its provider defaults,
+not the primary model's tuning. Executions show the actual model/provider and
+the failover reason. Authorization remains enforced by the backend.
 
 With auth enabled:
 

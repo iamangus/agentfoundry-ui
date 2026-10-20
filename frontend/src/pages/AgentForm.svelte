@@ -1,6 +1,8 @@
 <script>
   import { api } from '../lib/api.js'
-  import { teams, loadTeams } from '../lib/stores.js'
+  import { onMount, tick } from 'svelte'
+  import { confirmAction } from '../lib/feedback.js'
+  import { teams, loadTeams, setNavigationGuard } from '../lib/stores.js'
 
   let { def, isNew = false, onsave, oncancel, servers = [], providers = [], agents = [] } = $props()
 
@@ -23,6 +25,29 @@
   let availableProviders = $state(initial().providers || [])
   let loading = $state(false)
   let providerID = $state(initial().def.provider_id || '')
+  let backupProviderID = $state(initial().def.backup_provider_id || '')
+  let backupModel = $state(initial().def.backup_model || '')
+  let error = $state('')
+  let saving = $state(false)
+  let baseline = $state('')
+  let errorElement = $state(null)
+  const signature = $derived(JSON.stringify([name, description, model, systemPrompt, providerID, backupProviderID, backupModel, maxTurns, maxConcurrentTools, forceJson, scope, team, soEnabled, soJSON, modelParams, customParamsRaw, memoryEnabled, memorySearchAgentID, memoryIngestAgentID, selectedServers, subAgents, handoffTo, handoffs, preInferenceProcessors, toolOverrides, Object.entries(enabledTools).map(([key, values]) => [key, [...values]])]))
+  const dirty = $derived(baseline !== '' && signature !== baseline)
+  async function allowLeave() {
+    return !dirty || await confirmAction('Your unsaved agent changes will be lost.', { title: 'Discard changes?', label: 'Discard changes' })
+  }
+  async function cancel() { if (!saving && await allowLeave()) oncancel() }
+  function beforeUnload(event) { if (dirty) { event.preventDefault(); event.returnValue = '' } }
+  onMount(() => {
+    tick().then(() => baseline = signature)
+    setNavigationGuard(allowLeave)
+    return () => setNavigationGuard(null)
+  })
+  async function showError(message) {
+    error = message
+    await tick()
+    errorElement?.focus()
+  }
   let modelCapsPromise = $state(Promise.resolve(null))
   let modelParams = $state(initial().def.model_params ? (typeof initial().def.model_params === 'string' ? JSON.parse(initial().def.model_params) : initial().def.model_params) : {})
 let modelParamsExpanded = $state(false)
@@ -339,7 +364,13 @@ let modelParamsExpanded = $state(false)
     return Object.keys(getOverrides(serverName, toolName))
   }
 
-  function handleSave() {
+  async function handleSave() {
+    if (saving) return
+    error = ''
+    if (!name.trim() || !systemPrompt.trim()) { await showError('Name and system prompt are required. Complete both fields, then save again.'); return }
+    if (scope === 'team' && !team) { await showError('Choose a team for this agent.'); return }
+    if (backupProviderID && !providerID) { await showError('Choose a primary provider before adding a backup.'); return }
+    if (maxTurns < 0 || maxConcurrentTools < 0) { await showError('Turn and tool limits cannot be negative.'); return }
     const tools = []
     for (const s of selectedServers) {
       const et = enabledTools[s]
@@ -353,11 +384,13 @@ let modelParamsExpanded = $state(false)
     }
 
     let so = null
+    if (soEnabled && !soJSON.trim()) { await showError('Add a structured output schema in Limits, scope & output, or turn structured output off.'); return }
     if (soEnabled && soJSON.trim()) {
       try {
         so = JSON.parse(soJSON)
+        if (!so || typeof so !== 'object' || Array.isArray(so) || !so.name || !so.schema) throw new Error('Expected a named schema')
       } catch {
-        alert('Invalid structured output JSON')
+        await showError('Structured output is not valid JSON. Check the Advanced section.')
         return
       }
     }
@@ -366,8 +399,9 @@ let modelParamsExpanded = $state(false)
       let custom
       try {
         custom = JSON.parse(customParamsRaw)
+        if (!custom || typeof custom !== 'object' || Array.isArray(custom)) throw new Error('Expected a JSON object')
       } catch {
-        alert('Invalid custom parameters JSON')
+        await showError('Custom model parameters are not valid JSON. Check Models & reliability.')
         return
       }
       modelParams = { ...modelParams, ...custom }
@@ -379,7 +413,7 @@ let modelParamsExpanded = $state(false)
 			try {
 				processorConfig = JSON.parse(processor.configText || '{}')
 			} catch {
-				alert(`Invalid JSON configuration for pre-inference processor ${processor.id || processor.processor || 'new processor'}`)
+				await showError(`Invalid JSON configuration for pre-inference processor ${processor.id || processor.processor || 'new processor'}`)
 				return
 			}
 			processors.push({
@@ -394,12 +428,15 @@ let modelParamsExpanded = $state(false)
 
       const mpObj = Object.keys(modelParams).length > 0 ? modelParams : undefined
 
-      onsave({
+      saving = true
+      try { await onsave({
         originalName: def.name,
         name,
         description,
         model,
         provider_id: providerID,
+        backup_provider_id: backupProviderID,
+        backup_model: backupProviderID ? backupModel : '',
         system_prompt: systemPrompt,
       model_params: mpObj,
       tools,
@@ -418,22 +455,28 @@ let modelParamsExpanded = $state(false)
 		pre_inference_processors: processors,
        kind: 'agent',
     })
+      baseline = signature
+      } catch (e) { await showError('Could not save agent: ' + e.message) }
+      finally { saving = false }
   }
 </script>
+<svelte:window onbeforeunload={beforeUnload} />
 
 <div class="form-page">
   <div class="form-header">
-    <h2 class="form-title">{isNew ? 'New Agent' : 'Edit Agent'}</h2>
+    <div><h2 class="form-title">{isNew ? 'Create agent' : name || 'Edit agent'}</h2><p class="field-help">{saving ? 'Saving changes…' : dirty ? 'Unsaved changes' : 'Configure how this agent thinks and works.'}</p></div>
     <div class="form-header-actions">
-      <button onclick={handleSave} class="sb-submit" style="width:auto;">Save</button>
-      <button onclick={oncancel} class="cancel-btn">Cancel</button>
+      <button onclick={handleSave} disabled={saving} class="sb-submit" style="width:auto;">{saving ? 'Saving…' : 'Save agent'}</button>
+      <button onclick={cancel} disabled={saving} class="cancel-btn">Cancel</button>
     </div>
   </div>
 
   <div class="form-body">
+    {#if error}<div class="inline-error" role="alert" tabindex="-1" bind:this={errorElement}>{error}</div>{/if}
+    <section class="editor-section"><h3>Identity</h3><p class="field-help">Give your agent a recognizable name and purpose.</p>
     <div class="form-group">
       <label class="form-label" for="agent-name">Name</label>
-      <input id="agent-name" value={name} oninput={(e) => name = e.target.value} class="sb-input" placeholder="Agent name" />
+      <input id="agent-name" aria-required="true" aria-invalid={!!error && !name.trim()} value={name} oninput={(e) => name = e.target.value} class="sb-input" placeholder="Agent name" />
     </div>
 
     <div class="form-group">
@@ -441,19 +484,34 @@ let modelParamsExpanded = $state(false)
       <input id="agent-description" value={description} oninput={(e) => description = e.target.value} class="sb-input" placeholder="Brief description" />
     </div>
 
+    </section>
+    <section class="editor-section"><h3>Models & reliability</h3><p class="field-help">Choose the primary model and an optional backup for service interruptions.</p>
     <div class="form-group">
-      <label class="form-label" for="agent-model">Model</label>
+      <label class="form-label" for="agent-model">Primary model</label>
       <input id="agent-model" value={model} oninput={(e) => model = e.target.value} class="sb-input" placeholder="e.g. gpt-4o" />
     </div>
 
     <div class="form-group">
-      <label class="form-label" for="agent-provider">Inference Provider</label>
+      <label class="form-label" for="agent-provider">Primary provider</label>
       <select id="agent-provider" value={providerID} onchange={(e) => providerID = e.target.value} class="sb-input">
         <option value="">-- none --</option>
         {#each availableProviders as p}
           <option value={p.id}>{p.name} ({p.provider_type})</option>
         {/each}
       </select>
+    </div>
+
+    <div class="backup-config">
+      <label class="form-label" for="backup-provider">Backup provider <span class="optional-label">Optional</span></label>
+      <select id="backup-provider" bind:value={backupProviderID} class="sb-input" aria-describedby="backup-help">
+        <option value="">No backup</option>
+        {#each availableProviders as p}<option value={p.id}>{p.name} ({p.provider_type})</option>{/each}
+      </select>
+      {#if backupProviderID}
+        <label class="form-label" for="backup-model">Backup model</label>
+        <input id="backup-model" class="sb-input" bind:value={backupModel} placeholder={availableProviders.find(p => p.id === backupProviderID)?.default_model || 'Use provider default'} />
+      {/if}
+      <p id="backup-help" class="field-help">After 2 failed primary attempts on a model call, switch to the backup for the rest of the run. Applies to rate limits, timeouts, connection failures, and server errors. Backup uses its provider defaults, not primary model tuning.</p>
     </div>
 
     {#await modelCapsPromise}
@@ -476,7 +534,7 @@ let modelParamsExpanded = $state(false)
                 {#if param === 'reasoning'}
                   <div class="param-group">
                     <span class="param-label">Reasoning Effort</span>
-                    <select class="sb-input" value={modelParams.reasoning?.effort || 'auto'} onchange={(e) => {
+                    <select aria-label="Reasoning effort" class="sb-input" value={modelParams.reasoning?.effort || 'auto'} onchange={(e) => {
                       const mp = { ...modelParams }
                       if (!mp.reasoning) mp.reasoning = {}
                       mp.reasoning.effort = e.target.value || undefined
@@ -493,7 +551,7 @@ let modelParamsExpanded = $state(false)
                       {/if}
                     </select>
                     <span class="param-label" style="margin-top:8px;">Max Reasoning Tokens</span>
-                    <input type="number" class="sb-input" value={modelParams.reasoning?.max_tokens || ''} placeholder="Optional" oninput={(e) => {
+                    <input aria-label="Max reasoning tokens" type="number" class="sb-input" value={modelParams.reasoning?.max_tokens || ''} placeholder="Optional" oninput={(e) => {
                       const mp = { ...modelParams }
                       if (!mp.reasoning) mp.reasoning = {}
                       mp.reasoning.max_tokens = e.target.value ? parseInt(e.target.value) : undefined
@@ -514,7 +572,7 @@ let modelParamsExpanded = $state(false)
                 {:else if param === 'max_tokens'}
                   <div class="param-group">
                     <span class="param-label">Max Tokens</span>
-                    <input type="number" class="sb-input" value={modelParams.max_tokens || ''} placeholder="Optional" oninput={(e) => {
+                    <input aria-label="Max tokens" type="number" class="sb-input" value={modelParams.max_tokens || ''} placeholder="Optional" oninput={(e) => {
                       const mp = { ...modelParams }
                       mp.max_tokens = e.target.value ? parseInt(e.target.value) : undefined
                       if (!mp.max_tokens) delete mp.max_tokens
@@ -524,7 +582,7 @@ let modelParamsExpanded = $state(false)
                 {:else if param === 'temperature'}
                   <div class="param-group">
                     <span class="param-label">Temperature</span>
-                    <input type="number" class="sb-input" value={modelParams.temperature ?? ''} step="0.1" min="0" max="2" placeholder="Optional" oninput={(e) => {
+                    <input aria-label="Temperature" type="number" class="sb-input" value={modelParams.temperature ?? ''} step="0.1" min="0" max="2" placeholder="Optional" oninput={(e) => {
                       const mp = { ...modelParams }
                       mp.temperature = e.target.value ? parseFloat(e.target.value) : undefined
                       if (mp.temperature === undefined) delete mp.temperature
@@ -534,7 +592,7 @@ let modelParamsExpanded = $state(false)
                 {:else if param === 'top_p'}
                   <div class="param-group">
                     <span class="param-label">Top P</span>
-                    <input type="number" class="sb-input" value={modelParams.top_p ?? ''} step="0.05" min="0" max="1" placeholder="Optional" oninput={(e) => {
+                    <input aria-label="Top P" type="number" class="sb-input" value={modelParams.top_p ?? ''} step="0.05" min="0" max="1" placeholder="Optional" oninput={(e) => {
                       const mp = { ...modelParams }
                       mp.top_p = e.target.value ? parseFloat(e.target.value) : undefined
                       if (mp.top_p === undefined) delete mp.top_p
@@ -574,11 +632,15 @@ let modelParamsExpanded = $state(false)
       {/if}
     {/await}
 
+    </section>
+    <section class="editor-section"><h3>Instructions</h3>
     <div class="form-group">
       <label class="form-label" for="agent-system-prompt">System Prompt</label>
-      <textarea id="agent-system-prompt" value={systemPrompt} oninput={(e) => systemPrompt = e.target.value} class="sb-input form-textarea" placeholder="System prompt..." rows="6"></textarea>
+      <textarea id="agent-system-prompt" aria-required="true" aria-invalid={!!error && !systemPrompt.trim()} value={systemPrompt} oninput={(e) => systemPrompt = e.target.value} class="sb-input form-textarea" placeholder="System prompt..." rows="6"></textarea>
     </div>
+    </section>
 
+		<details class="editor-section"><summary>Pre-inference context <span>Advanced</span></summary>
 		<div class="form-group">
 			<div class="tool-section-header">
 				<div>
@@ -602,12 +664,12 @@ let modelParamsExpanded = $state(false)
 								</div>
 							</div>
 							<div class="processor-fields">
-								<input class="sb-input" placeholder="ID (optional)" value={processor.id} oninput={(e) => updatePreInferenceProcessor(index, 'id', e.target.value)} />
-								<input class="sb-input" placeholder="Processor type" value={processor.processor} oninput={(e) => updatePreInferenceProcessor(index, 'processor', e.target.value)} />
-								<select class="sb-input" value={processor.phase || 'run_start'} onchange={(e) => updatePreInferenceProcessor(index, 'phase', e.target.value)}>
+								<input aria-label={`Processor ${index + 1} ID`} class="sb-input" placeholder="ID (optional)" value={processor.id} oninput={(e) => updatePreInferenceProcessor(index, 'id', e.target.value)} />
+								<input aria-label={`Processor ${index + 1} type`} class="sb-input" placeholder="Processor type" value={processor.processor} oninput={(e) => updatePreInferenceProcessor(index, 'processor', e.target.value)} />
+								<select aria-label={`Processor ${index + 1} phase`} class="sb-input" value={processor.phase || 'run_start'} onchange={(e) => updatePreInferenceProcessor(index, 'phase', e.target.value)}>
 									<option value="run_start">run_start</option>
 								</select>
-								<select class="sb-input" value={processor.on_error || 'warn'} onchange={(e) => updatePreInferenceProcessor(index, 'on_error', e.target.value)}>
+								<select aria-label={`Processor ${index + 1} error policy`} class="sb-input" value={processor.on_error || 'warn'} onchange={(e) => updatePreInferenceProcessor(index, 'on_error', e.target.value)}>
 									<option value="warn">warn on error</option>
 									<option value="skip">skip on error</option>
 									<option value="fail">fail on error</option>
@@ -615,13 +677,13 @@ let modelParamsExpanded = $state(false)
 							</div>
 							{#if processor.processor === 'mcp_tool'}
 								<div class="processor-fields">
-									<select class="sb-input" value={mcpToolConfig(processor).server || ''} onchange={(e) => updateMCPToolConfig(index, 'server', e.target.value)}>
+									<select aria-label={`Processor ${index + 1} MCP server`} class="sb-input" value={mcpToolConfig(processor).server || ''} onchange={(e) => updateMCPToolConfig(index, 'server', e.target.value)}>
 										<option value="">Select MCP server</option>
 										{#each availableServers as server}
 											<option value={server.name}>{server.name}</option>
 										{/each}
 									</select>
-									<select class="sb-input" value={mcpToolConfig(processor).tool || ''} disabled={!mcpToolConfig(processor).server} onchange={(e) => updateMCPToolConfig(index, 'tool', e.target.value)}>
+									<select aria-label={`Processor ${index + 1} tool`} class="sb-input" value={mcpToolConfig(processor).tool || ''} disabled={!mcpToolConfig(processor).server} onchange={(e) => updateMCPToolConfig(index, 'tool', e.target.value)}>
 										<option value="">Select tool</option>
 										{#each mcpTools(processor) as tool}
 											<option value={tool.name}>{tool.name}</option>
@@ -630,15 +692,17 @@ let modelParamsExpanded = $state(false)
 								</div>
 							{/if}
 							<div class="form-label" style="margin-top:10px;">Timeout (seconds, 0 uses default)</div>
-							<input class="sb-input processor-timeout" type="number" min="0" value={processor.timeout || 0} oninput={(e) => updatePreInferenceProcessor(index, 'timeout', e.target.valueAsNumber || 0)} />
+							<input aria-label={`Processor ${index + 1} timeout seconds`} class="sb-input processor-timeout" type="number" min="0" value={processor.timeout || 0} oninput={(e) => updatePreInferenceProcessor(index, 'timeout', e.target.valueAsNumber || 0)} />
 							<div class="form-label" style="margin-top:10px;">Configuration (JSON)</div>
-							<textarea class="sb-input form-textarea mono" rows="4" value={processor.configText} oninput={(e) => updatePreInferenceProcessor(index, 'configText', e.target.value)}></textarea>
+							<textarea aria-label={`Processor ${index + 1} configuration JSON`} class="sb-input form-textarea mono" rows="4" value={processor.configText} oninput={(e) => updatePreInferenceProcessor(index, 'configText', e.target.value)}></textarea>
 						</div>
 					{/each}
 				</div>
 			{/if}
 		</div>
 
+    </details>
+    <details class="editor-section" open><summary>Tools & delegation</summary>
     <div class="form-group">
       <div class="tool-section-header">
         <span class="form-label" style="margin-bottom:0;">Tools & Sub-agents</span>
@@ -655,7 +719,7 @@ let modelParamsExpanded = $state(false)
 
         {#if availableAgentOptions().length > 0}
           <div class="tool-add-row">
-            <select class="sb-input tool-server-select" id="agent-select">
+            <select aria-label="Add sub-agent" class="sb-input tool-server-select" id="agent-select">
               <option value="">-- Select agent --</option>
               {#each availableAgentOptions() as a}
                 <option value={a.name}>{a.name}</option>
@@ -693,7 +757,7 @@ let modelParamsExpanded = $state(false)
 
         {#if availableServerOptions().length > 0}
           <div class="tool-add-row">
-            <select class="sb-input tool-server-select" id="server-select">
+            <select aria-label="Add MCP server tools" class="sb-input tool-server-select" id="server-select">
               <option value="">-- Select MCP server --</option>
               {#each availableServerOptions() as srv}
                 <option value={srv.name}>{srv.name} ({srv.tools.length} tools)</option>
@@ -822,6 +886,8 @@ let modelParamsExpanded = $state(false)
       {/if}
     </div>
 
+    </details>
+    <details class="editor-section"><summary>Limits, scope & output <span>Advanced</span></summary>
     <div class="form-row">
       <div class="form-group">
         <label class="form-label" for="agent-max-turns">Max Turns</label>
@@ -868,10 +934,12 @@ let modelParamsExpanded = $state(false)
         Structured Output
       </label>
       {#if soEnabled}
-        <textarea value={soJSON} oninput={(e) => soJSON = e.target.value} class="sb-input form-textarea mono" placeholder='"name": "", "schema": null, "strict": false' rows="8" style="margin-top:8px;"></textarea>
+        <textarea aria-label="Structured output schema JSON" value={soJSON} oninput={(e) => soJSON = e.target.value} class="sb-input form-textarea mono" placeholder='"name": "", "schema": null, "strict": false' rows="8" style="margin-top:8px;"></textarea>
       {/if}
     </div>
 
+    </details>
+    <details class="editor-section"><summary>Handoffs</summary>
     <div class="form-group">
       <div class="tool-divider"></div>
       <div class="tool-section-label">Handoffs</div>
@@ -888,7 +956,7 @@ let modelParamsExpanded = $state(false)
       <span class="form-label" style="margin-top:16px; margin-bottom:4px;">LLM-invoked handoffs</span>
       {#if availableHandoffOptions().length > 0}
         <div class="tool-add-row">
-          <select class="sb-input tool-server-select" id="handoff-select">
+          <select aria-label="Add handoff agent" class="sb-input tool-server-select" id="handoff-select">
             <option value="">-- Select agent --</option>
             {#each availableHandoffOptions() as a}
               <option value={a.name}>{a.name}</option>
@@ -921,6 +989,8 @@ let modelParamsExpanded = $state(false)
       {/if}
     </div>
 
+    </details>
+    <details class="editor-section"><summary>Memory</summary>
     <div class="form-group">
       <label class="form-check">
         <input checked={memoryEnabled} onchange={(e) => memoryEnabled = e.target.checked} type="checkbox" />
@@ -939,6 +1009,7 @@ let modelParamsExpanded = $state(false)
         </div>
       {/if}
     </div>
+    </details>
   </div>
 </div>
 
