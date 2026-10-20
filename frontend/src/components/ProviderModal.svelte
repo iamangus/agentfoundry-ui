@@ -1,5 +1,6 @@
 <script>
   import { api } from '../lib/api.js'
+  import { dialogFocus } from '../lib/dialog.js'
   import { teams, loadTeams } from '../lib/stores.js'
 
   let { provider = null, onclose, oncreated } = $props()
@@ -116,11 +117,11 @@
 
 <div class="modal-backdrop">
   <button class="modal-dismiss" onclick={close} aria-label="Close provider form"></button>
-  <div class="modal-card" role="dialog" aria-modal="true" aria-label="Inference provider" tabindex="-1" onkeydown={onkeydown}>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-label="Inference provider" tabindex="-1" use:dialogFocus onkeydown={onkeydown}>
     <h3 class="modal-title">{isEdit ? 'Edit Provider' : 'Add Inference Provider'}</h3>
 
     {#if error}
-      <div class="form-error">{error}</div>
+      <div class="form-error" role="alert">{error}</div>
     {/if}
 
     <label class="modal-label" for="provider-name">Name</label>

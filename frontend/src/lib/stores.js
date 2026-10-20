@@ -1,4 +1,4 @@
-import { writable, get } from 'svelte/store'
+import { writable } from 'svelte/store'
 import { api } from './api.js'
 
 export const user = writable(null)
@@ -25,9 +25,14 @@ export async function loadTeams() {
   }
 }
 
-export function navigate(path) {
+let navigationGuard = null
+export function setNavigationGuard(guard) { navigationGuard = guard }
+export async function canNavigate() { return !navigationGuard || await navigationGuard() }
+
+export async function navigate(path) {
+  if (!await canNavigate()) return
   history.pushState({}, '', path)
-  window.dispatchEvent(new PopStateEvent('popstate'))
+  window.dispatchEvent(new CustomEvent('appnavigate'))
 }
 
 function createThemeStore() {
@@ -52,8 +57,7 @@ function createThemeStore() {
       set(value)
     },
     toggle: () => {
-      const current = get(theme)
-      const next = current === 'system' ? 'dark' : current === 'dark' ? 'light' : 'system'
+      const next = document.documentElement.classList.contains('dark') ? 'light' : 'dark'
       theme.set(next)
     },
   }

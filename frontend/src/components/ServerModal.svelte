@@ -1,5 +1,6 @@
 <script>
   import { api } from '../lib/api.js'
+  import { dialogFocus } from '../lib/dialog.js'
   import { teams, loadTeams } from '../lib/stores.js'
 
   let { server = null, onclose, oncreated } = $props()
@@ -158,11 +159,11 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="modal-backdrop" onclick={close} onkeydown={onkeydown}>
   <!-- svelte-ignore a11y_click_events_have_key_events a11y_interactive_supports_focus -->
-  <div class="modal-card" onclick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" tabindex="-1">
+  <div class="modal-card" onclick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="MCP server" tabindex="-1" use:dialogFocus>
     <h3 class="modal-title">{isEdit ? 'Edit Server' : 'Register MCP Server'}</h3>
 
     {#if error}
-      <div class="form-error">{error}</div>
+      <div class="form-error" role="alert">{error}</div>
     {/if}
 
     <label class="modal-label" for="server-name">Name</label>

@@ -10,29 +10,39 @@
   let selectedSpan = $state(null)
   let selectedSpanExecId = $state(null)
   let now = $state(Date.now())
+  let search = $state('')
+  let loadError = $state('')
+  let refreshing = false
+  let requestVersion = 0
+  const filtered = $derived(executions.filter(e => `${e.agent_name || ''} ${e.workflow_id}`.toLowerCase().includes(search.toLowerCase())))
 
   $effect(() => {
     loadExecutions()
-    const interval = setInterval(() => {
-      loadExecutions(true)
-      refreshExpandedHistories()
-    }, 1000)
+    const interval = setInterval(async () => {
+      if (document.hidden || refreshing) return
+      refreshing = true
+      try { await loadExecutions(true); await refreshExpandedHistories() }
+      finally { refreshing = false }
+    }, 3000)
     return () => clearInterval(interval)
   })
 
   $effect(() => {
-    const interval = setInterval(() => now = Date.now(), 50)
+    const interval = setInterval(() => now = Date.now(), 1000)
     return () => clearInterval(interval)
   })
 
   async function loadExecutions(silent = false) {
+    const version = ++requestVersion
     if (!silent) loading = true
     try {
       let url = '/api/v1/executions'
       if (statusFilter) url += '?status=' + statusFilter
-      executions = await api.get(url)
+      const result = await api.get(url)
+      if (version === requestVersion) { executions = result; loadError = '' }
     } catch (e) {
       console.error('Failed to load executions', e)
+      if (version === requestVersion) loadError = 'Could not refresh executions. Existing results may be out of date. ' + e.message
     } finally {
       if (!silent) loading = false
     }
@@ -42,11 +52,11 @@
     const ids = [...expandedExecs]
     if (!ids.length) return
     const results = await Promise.allSettled(
-      ids.map(id => api.get(`/api/v1/executions/${id}`))
+      ids.filter(id => histories[id]?.data?.status === 'Running').map(async id => ({ id, data: await api.get(`/api/v1/executions/${encodeURIComponent(id)}`), trace: await api.get(`/api/v1/executions/${encodeURIComponent(id)}/trace`) }))
     )
     results.forEach((r, i) => {
       if (r.status === 'fulfilled') {
-        histories[ids[i]] = { ...histories[ids[i]], data: r.value }
+        histories[r.value.id] = { data: r.value.data, trace: r.value.trace }
       }
     })
     histories = { ...histories }
@@ -70,8 +80,8 @@
       histories[execId] = { ...histories[execId], loading: true }
       histories = { ...histories }
       try {
-        const data = await api.get(`/api/v1/executions/${execId}`)
-        histories[execId] = { loading: false, data }
+        const [data, trace] = await Promise.all([api.get(`/api/v1/executions/${encodeURIComponent(execId)}`), api.get(`/api/v1/executions/${encodeURIComponent(execId)}/trace`)])
+        histories[execId] = { loading: false, data, trace }
         histories = { ...histories }
       } catch (e) {
         console.error('Failed to load execution history', e)
@@ -192,9 +202,9 @@
 
 <div class="executions-page">
   <div class="page-header">
-    <h3 class="section-title">Executions</h3>
+    <h1 class="section-title">Executions</h1>
     <div class="header-actions">
-      <select bind:value={statusFilter} class="status-filter" onchange={() => loadExecutions()}>
+      <select aria-label="Filter executions by status" bind:value={statusFilter} class="status-filter" onchange={() => loadExecutions()}>
         <option value="">All Statuses</option>
         <option value="Running">Running</option>
         <option value="Completed">Completed</option>
@@ -209,20 +219,23 @@
     </div>
   </div>
 
+  <p class="page-description">Follow agent runs from model calls to tool results. Running executions refresh every 3 seconds.</p>
+  <div class="list-toolbar"><input class="sb-input" type="search" aria-label="Search executions" placeholder="Search agents or workflow IDs…" bind:value={search} /><span class="result-count">{filtered.length} executions</span></div>
+  {#if loadError}<div class="inline-error" role="alert">{loadError}</div>{/if}
   {#if loading}
     <p style="color:var(--text-muted); padding:20px;">Loading executions...</p>
-  {:else if executions.length === 0}
+  {:else if executions.length === 0 && !loadError}
     <div class="empty-state">
       <p class="empty-title">No executions found</p>
       <p class="empty-desc">Run an agent from the Chat or Agents tab to see workflow executions appear here. Data is sourced directly from Temporal.</p>
     </div>
   {:else}
     <div class="execution-cards">
-      {#each executions as exec (exec.workflow_id)}
+      {#each filtered as exec (exec.workflow_id)}
         {@const hstate = histories[exec.workflow_id]}
         {@const hx = hstate?.data}
         <div class="execution-card" class:expanded={expandedExecs.has(exec.workflow_id)}>
-          <div class="execution-card-header" onclick={() => toggleExpand(exec.workflow_id)} onkeydown={(e) => { if (e.key === 'Enter') toggleExpand(exec.workflow_id) }} role="button" tabindex="0">
+          <div class="execution-card-header" aria-expanded={expandedExecs.has(exec.workflow_id)} onclick={() => toggleExpand(exec.workflow_id)} onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleExpand(exec.workflow_id) } }} role="button" tabindex="0">
             <div class="execution-card-main">
               <div class="execution-title-row">
                 <span class="execution-agent-name">{exec.agent_name || 'unknown agent'}</span>
@@ -271,6 +284,20 @@
                     <span class="detail-value">{formatDuration(hx.start_time, hx.close_time, now)}</span>
                   </div>
                 </div>
+                {#if hstate.trace?.events?.length}
+                  <section class="model-trace" aria-label="Inference and tool trace">
+                    <h2 class="trace-heading">Run activity</h2>
+                    {#each hstate.trace.events.filter(e => e.kind === 'model' || e.kind === 'tool') as event}
+                      <details class="trace-entry">
+                        <summary><span class="trace-kind">{event.kind === 'model' ? 'Model' : 'Tool'}</span> <strong>{event.model || event.tool || event.activity}</strong> {#if event.backup}<span class="backup-badge">Backup</span>{/if} {#if event.error}<span class="trace-error">Failed</span>{/if}</summary>
+                        {#if event.provider_id}<p class="field-help">Provider: <code>{event.provider_id}</code></p>{/if}
+                        {#if event.attempts}<p class="field-help">{event.attempts} {event.attempts === 1 ? 'attempt' : 'attempts'}</p>{/if}
+                        {#if event.failover_reason}<p class="failover-reason">{event.failover_reason}</p>{/if}
+                        <pre>{JSON.stringify({ input: event.input, output: event.output, error: event.error }, null, 2)}</pre>
+                      </details>
+                    {/each}
+                  </section>
+                {/if}
                 {#if hx.spans && hx.spans.length > 0}
                   {@const globalStart = new Date(hx.spans[0].start_time).getTime()}
                   {@const globalEnd = hx.close_time ? new Date(hx.close_time).getTime() : now}
@@ -360,6 +387,7 @@
           {/if}
         </div>
       {/each}
+      {#if !filtered.length && !loadError}<p class="empty-state">No executions match “{search}”. Try another search.</p>{/if}
     </div>
   {/if}
 </div>

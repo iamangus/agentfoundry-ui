@@ -1,5 +1,7 @@
 <script>
   import { api } from '../lib/api.js'
+  import { notify, confirmAction } from '../lib/feedback.js'
+  import { dialogFocus } from '../lib/dialog.js'
 
   let keys = $state([])
   let newKey = $state(null)
@@ -7,16 +9,20 @@
   let creating = $state(false)
   let showCreateModal = $state(false)
   let modalNameInput = $state(null)
+  let loadError = $state('')
+  let createError = $state('')
 
   $effect(() => {
     loadKeys()
   })
 
   async function loadKeys() {
+    loadError = ''
     try {
       keys = await api.get('/api/keys')
     } catch (e) {
       console.error('Failed to load API keys', e)
+      loadError = 'Could not load API keys. ' + e.message
     } finally {
       loading = false
     }
@@ -24,6 +30,7 @@
 
   function openCreateModal() {
     showCreateModal = true
+    createError = ''
   }
 
   function closeCreateModal() {
@@ -31,8 +38,9 @@
   }
 
   async function createKey() {
+    if (creating) return
     const name = modalNameInput?.value?.trim()
-    if (!name) return
+    if (!name) { createError = 'Enter a name so you can identify this key later.'; return }
     creating = true
     try {
       const key = await api.post('/api/keys', { name })
@@ -42,18 +50,20 @@
       await loadKeys()
     } catch (e) {
       console.error('Failed to create key', e)
-      alert('Failed to create key: ' + e.message)
+      createError = 'Could not create key: ' + e.message
     } finally {
       creating = false
     }
   }
 
   async function revokeKey(id) {
-    if (!confirm('Revoke this API key?')) return
+    if (!await confirmAction('Applications using this key will immediately lose access. This cannot be undone.', { title: 'Revoke API key?', label: 'Revoke key' })) return
     try {
       await api.del('/api/keys/' + id)
     } catch (e) {
       console.error('Failed to revoke key', e)
+      notify('Could not revoke key: ' + e.message)
+      return
     }
     keys = keys.filter(k => k.id !== id)
     await loadKeys()
@@ -61,16 +71,18 @@
 
   function copyKey(key) {
     navigator.clipboard.writeText(key).then(() => {
-      alert('Key copied to clipboard')
-    })
+      notify('Key copied to clipboard', 'success')
+    }).catch(() => notify('Could not copy key. Select the key and copy it manually.'))
   }
 </script>
 
 <div class="keys-page">
   <div class="page-header">
-    <h2 class="page-title">API Keys</h2>
+    <h1 class="page-title">API keys</h1>
     <button onclick={openCreateModal} class="sb-submit" style="width:auto; padding: 7px 16px;">Create Key</button>
   </div>
+  <p class="page-description">Manage application access. Store keys securely and revoke any you no longer use.</p>
+  {#if loadError}<div class="inline-error" role="alert">{loadError} <button class="secondary-button" onclick={loadKeys}>Retry</button></div>{/if}
 
   {#if newKey && newKey.full_key}
     <div class="create-section">
@@ -83,6 +95,7 @@
             </svg>
             Copy
           </button>
+          <button class="secondary-button" onclick={() => newKey = null}>Hide key</button>
         </div>
         <code class="full-key">{newKey.full_key}</code>
       </div>
@@ -105,9 +118,9 @@
           </tr>
         </thead>
         <tbody>
-          {#if keys.length === 0}
+          {#if keys.length === 0 && !loadError}
             <tr>
-              <td colspan="6" style="text-align:center; padding:32px; color:var(--text-muted);">No API keys</td>
+              <td colspan="6" style="text-align:center; padding:32px; color:var(--text-muted);">No API keys yet. Create a key to connect an application.</td>
             </tr>
           {:else}
             {#each keys as key}
@@ -137,8 +150,9 @@
     onkeydown={(e) => { if (e.key === 'Escape') closeCreateModal() }}
   >
     <!-- svelte-ignore a11y_click_events_have_key_events a11y_interactive_supports_focus -->
-    <div class="modal-card" onclick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" tabindex="-1">
-      <h3 class="modal-title">Create API Key</h3>
+    <div class="modal-card" onclick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="create-key-title" tabindex="-1" use:dialogFocus>
+      <h3 id="create-key-title" class="modal-title">Create API key</h3>
+      {#if createError}<div class="inline-error" role="alert">{createError}</div>{/if}
       <label class="modal-label" for="modal-key-name">Key name</label>
       <input
         id="modal-key-name"

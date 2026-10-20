@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"html"
 	"io"
 	"net/http"
 	"strings"
@@ -504,7 +505,7 @@ func (m *Manager) redirectToLogin(w http.ResponseWriter, r *http.Request) {
 
 func renderLoginPage(loginURL string) string {
 	return `<!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -514,31 +515,32 @@ func renderLoginPage(loginURL string) string {
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
 <style>
   *, *::before, *::after { box-sizing: border-box; }
+  :root {
+    --bg-base: #fbfbfd; --bg-card: #fff; --border: #e3e3ed;
+    --text-base: #20202b; --text-muted: #646477;
+    --purple: #6d35ce; --purple-dim: #eee7fb; --purple-solid: #6d35ce;
+    color-scheme: light;
+  }
   .dark {
-    --bg-base: #0f0f11;
-    --bg-card: #18181c;
-    --border: #27272a;
-    --text-base: #e4e4e7;
-    --text-muted: #71717a;
-    --purple: oklch(59.1% 0.249 292.7);
-    --purple-dim: oklch(59.1% 0.249 292.7 / 0.15);
-    --purple-solid: #7c3aed;
+    --bg-base: #131318; --bg-card: #1b1b23; --border: #34313f;
+    --text-base: #f0eff7; --text-muted: #aaa7bb;
+    --purple: #b99aff; --purple-dim: #302440; --purple-solid: #8851dd;
+    color-scheme: dark;
   }
   html, body {
-    margin: 0; height: 100%;
+    margin: 0; min-height: 100%;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
     background: var(--bg-base); color: var(--text-base);
   }
   body {
-    display: flex; align-items: center; justify-content: center;
+    display: flex; align-items: center; justify-content: center; min-height: 100dvh; padding: 1rem;
   }
   .login-card {
     background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: 16px;
-    padding: 40px;
-    width: 380px;
-    max-width: 90vw;
+    padding: clamp(1.25rem, 5vw, 2.5rem);
+    width: min(100%, 400px);
     text-align: center;
   }
   .login-icon {
@@ -550,7 +552,7 @@ func renderLoginPage(loginURL string) string {
   }
   .login-icon svg { width: 28px; height: 28px; color: var(--purple); }
   .login-brand {
-    font-size: 1.1rem; font-weight: 700;
+    font-size: 1.5rem; font-weight: 700; letter-spacing: -.035em; margin-top: 0;
     margin-bottom: 8px;
   }
   .login-brand-agent { color: var(--text-base); }
@@ -569,21 +571,28 @@ func renderLoginPage(loginURL string) string {
     transition: opacity 0.15s;
   }
   .login-btn:hover { opacity: 0.88; }
+  .login-btn:focus-visible { outline: 2px solid var(--purple); outline-offset: 4px; }
   .login-btn svg { width: 16px; height: 16px; }
 </style>
+<script>
+try {
+  var theme = localStorage.getItem('theme') || 'system';
+  document.documentElement.classList.toggle('dark', theme === 'dark' || (theme === 'system' && matchMedia('(prefers-color-scheme: dark)').matches));
+} catch (_) {}
+</script>
 </head>
 <body>
-<div class="login-card">
+<main class="login-card">
   <div class="login-icon">
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
       <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z" />
     </svg>
   </div>
-  <div class="login-brand">
+  <h1 class="login-brand">
     <span class="login-brand-agent">agent</span><span class="login-brand-file">foundry</span>
-  </div>
-  <p class="login-sub">Sign in to continue to agentfoundry</p>
-  <a class="login-btn" href="` + loginURL + `">
+  </h1>
+  <p class="login-sub">Your agents, tools, and conversations.<br>Sign in to your workspace to continue.</p>
+  <a class="login-btn" href="` + html.EscapeString(loginURL) + `">
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path>
       <polyline points="10 17 15 12 10 7"></polyline>
@@ -591,7 +600,7 @@ func renderLoginPage(loginURL string) string {
     </svg>
     Sign in with Keycloak
   </a>
-</div>
+</main>
 </body>
 </html>`
 }

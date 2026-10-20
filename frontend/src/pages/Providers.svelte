@@ -1,12 +1,16 @@
 <script>
   import { api } from '../lib/api.js'
   import ProviderModal from '../components/ProviderModal.svelte'
+  import { notify, confirmAction } from '../lib/feedback.js'
 
   let providers = $state([])
   let loading = $state(true)
   let showModal = $state(false)
   let editingProvider = $state(null)
   let expandedProvider = $state(null)
+  let search = $state('')
+  let loadError = $state('')
+  const filtered = $derived(providers.filter(p => `${p.name} ${p.provider_type} ${p.default_model}`.toLowerCase().includes(search.toLowerCase())))
 
   $effect(() => {
     loadProviders()
@@ -14,10 +18,12 @@
 
   async function loadProviders() {
     loading = true
+    loadError = ''
     try {
       providers = await api.get('/api/v1/providers')
     } catch (e) {
       console.error('Failed to load providers', e)
+      loadError = 'Could not load providers. ' + e.message
     } finally {
       loading = false
     }
@@ -48,14 +54,14 @@
   }
 
   async function deleteProvider(prov) {
-    if (!confirm(`Delete provider "${prov.name}"?`)) return
+    if (!await confirmAction(`Delete provider "${prov.name}"? Agents using it for primary or backup inference may stop working.`, { title: 'Delete provider?', label: 'Delete provider' })) return
     try {
       await api.del('/api/v1/providers/' + encodeURIComponent(prov.id))
       if (expandedProvider === prov.id) expandedProvider = null
       loadProviders()
     } catch (e) {
       console.error('Failed to delete provider', e)
-      alert('Failed to delete: ' + e.message)
+      notify('Could not delete provider: ' + e.message)
     }
   }
 
@@ -74,7 +80,7 @@
 <div class="providers-page">
   <div class="page-header">
     <div class="section-header">
-      <h3 class="section-title">Inference Providers</h3>
+      <h1 class="section-title">Providers</h1>
       <button onclick={openCreateModal} class="sb-submit" style="width:auto; padding:8px 18px; font-size:0.82rem;">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
           <path d="M12 5v14M5 12h14"/>
@@ -84,18 +90,21 @@
     </div>
   </div>
 
+  <p class="page-description">Connect models to your agents. Keep credentials here, not in agent instructions.</p>
+  <div class="list-toolbar"><input class="sb-input" type="search" aria-label="Search providers" placeholder="Search providers or models…" bind:value={search} /><span class="result-count">{filtered.length} providers</span></div>
+  {#if loadError}<div class="inline-error" role="alert">{loadError} <button class="secondary-button" onclick={loadProviders}>Retry</button></div>{/if}
   {#if loading}
     <p style="color:var(--text-muted); padding:20px;">Loading...</p>
-  {:else if providers.length === 0}
+  {:else if providers.length === 0 && !loadError}
     <div class="empty-state">
       <p class="empty-title">No inference providers configured</p>
       <p class="empty-desc">Add an inference provider to enable LLM access for your agents. Agents reference providers by their <strong>Provider ID</strong>.</p>
     </div>
   {:else}
     <div class="provider-cards">
-      {#each providers as prov}
+      {#each filtered as prov}
         <div class="provider-card" class:expanded={expandedProvider === prov.id}>
-          <div class="provider-card-header" onclick={() => toggleExpand(prov.id)} onkeydown={(e) => { if (e.key === 'Enter') toggleExpand(prov.id) }} role="button" tabindex="0">
+          <div class="provider-card-header" aria-expanded={expandedProvider === prov.id} onclick={() => toggleExpand(prov.id)} onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleExpand(prov.id) } }} role="button" tabindex="0">
             <div class="provider-card-main">
               <span class="provider-name">{prov.name}</span>
               <div class="provider-meta-row">
@@ -140,6 +149,7 @@
           {/if}
         </div>
       {/each}
+      {#if !filtered.length && !loadError}<p class="empty-state">No providers match “{search}”. Try another search.</p>{/if}
     </div>
   {/if}
 </div>
