@@ -13,7 +13,13 @@ export function dialogFocus(node) {
   }
   const controls = () => [...node.querySelectorAll('button, a[href], input, select, textarea, [tabindex="0"]')]
     .filter(el => !el.disabled && el.getClientRects().length)
-  const frame = requestAnimationFrame(() => (controls()[0] || node).focus())
+  // Contain keyboard events immediately: waiting only for an animation frame
+  // leaves a newly inert background focused, so an early Escape can be lost.
+  const focusDialog = () => {
+    if (!node.contains(document.activeElement)) (controls()[0] || node).focus()
+  }
+  focusDialog()
+  const frame = requestAnimationFrame(focusDialog)
   function keydown(event) {
     if (event.key !== 'Tab') return
     const items = controls()

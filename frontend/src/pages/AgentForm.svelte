@@ -3,6 +3,8 @@
   import { onMount, tick } from 'svelte'
   import { confirmAction } from '../lib/feedback.js'
   import { teams, loadTeams, setNavigationGuard } from '../lib/stores.js'
+  import ModelPicker from '../components/ModelPicker.svelte'
+  import InferenceProfileModal from '../components/InferenceProfileModal.svelte'
 
   let { def, isNew = false, onsave, oncancel, servers = [], providers = [], agents = [] } = $props()
 
@@ -27,6 +29,40 @@
   let providerID = $state(initial().def.provider_id || '')
   let backupProviderID = $state(initial().def.backup_provider_id || '')
   let backupModel = $state(initial().def.backup_model || '')
+  let inferenceProfiles = $state([])
+  let profileID = $state('')
+  let profilesError = $state('')
+  let showProfileModal = $state(false)
+  let profileNotice = $state('')
+  onMount(() => { loadProfiles() })
+  async function loadProfiles() {
+    profilesError = ''
+    try { inferenceProfiles = await api.get('/api/v1/inference-profiles') || [] }
+    catch (e) { profilesError = e.message }
+  }
+  async function applyProfile() {
+    const profile = inferenceProfiles.find(p => p.id === profileID)
+    if (!profile) return
+    const compatible = [profile.provider_id, profile.backup_provider_id].filter(Boolean).every(id => {
+      const provider = availableProviders.find(p => p.id === id)
+      if (!provider) return false
+      return provider.scope === 'global' || scope !== 'global' && (scope !== 'team' || provider.scope === 'team' && provider.team === team)
+    })
+    if (!compatible) { await showError('This profile uses providers that are not available to the agent’s scope. Choose another profile or change the agent scope.'); return }
+    if (providerID || backupProviderID || model) {
+      if (!await confirmAction('Replace primary and backup settings with this profile? Primary model tuning is cleared when the primary model or provider changes. Save the agent to keep these changes.', { title: 'Apply inference profile?', label: 'Apply profile' })) return
+    }
+    if (providerID !== profile.provider_id || model !== profile.model) {
+      modelParams = {}
+      customParamsRaw = ''
+      customParamsDirty = false
+    }
+    providerID = profile.provider_id
+    model = profile.model
+    backupProviderID = profile.backup_provider_id || ''
+    backupModel = profile.backup_model || ''
+    profileNotice = `Applied “${profile.name}” to this draft. Save the agent to keep it. Future profile edits will not change this agent.`
+  }
   let error = $state('')
   let saving = $state(false)
   let baseline = $state('')
@@ -462,6 +498,10 @@ let modelParamsExpanded = $state(false)
 </script>
 <svelte:window onbeforeunload={beforeUnload} />
 
+{#if showProfileModal}
+  <InferenceProfileModal routing={{ provider_id: providerID, model, backup_provider_id: backupProviderID, backup_model: backupModel }} providers={availableProviders} onclose={() => showProfileModal = false} onsaved={() => { showProfileModal = false; profileNotice = 'Profile saved. This agent remains independent of it.'; loadProfiles() }} />
+{/if}
+
 <div class="form-page">
   <div class="form-header">
     <div><h2 class="form-title">{isNew ? 'Create agent' : name || 'Edit agent'}</h2><p class="field-help">{saving ? 'Saving changes…' : dirty ? 'Unsaved changes' : 'Configure how this agent thinks and works.'}</p></div>
@@ -487,8 +527,21 @@ let modelParamsExpanded = $state(false)
     </section>
     <section class="editor-section"><h3>Models & reliability</h3><p class="field-help">Choose the primary model and an optional backup for service interruptions.</p>
     <div class="form-group">
+      <label class="form-label" for="inference-profile">Inference profile</label>
+      <select id="inference-profile" class="sb-input" bind:value={profileID}>
+        <option value="">Choose a saved template</option>
+        {#each inferenceProfiles as p}<option value={p.id}>{p.name} ({p.scope === 'user' ? 'Personal' : p.scope})</option>{/each}
+      </select>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+        <button class="secondary-button" onclick={applyProfile} disabled={!profileID}>Apply profile</button>
+        <button class="secondary-button" onclick={() => showProfileModal = true} disabled={!providerID}>Save as profile</button>
+      </div>
+      {#if profilesError}<p class="field-help" role="status">Could not load profiles: {profilesError} <button class="secondary-button" onclick={loadProfiles}>Retry</button></p>{/if}
+      {#if profileNotice}<p class="field-help" role="status">{profileNotice}</p>{/if}
+    </div>
+    <div class="form-group">
       <label class="form-label" for="agent-model">Primary model</label>
-      <input id="agent-model" value={model} oninput={(e) => model = e.target.value} class="sb-input" placeholder="e.g. gpt-4o" />
+      <ModelPicker id="agent-model" bind:value={model} {providerID} placeholder={availableProviders.find(p => p.id === providerID)?.default_model || 'Choose or enter a model'} />
     </div>
 
     <div class="form-group">
@@ -509,7 +562,7 @@ let modelParamsExpanded = $state(false)
       </select>
       {#if backupProviderID}
         <label class="form-label" for="backup-model">Backup model</label>
-        <input id="backup-model" class="sb-input" bind:value={backupModel} placeholder={availableProviders.find(p => p.id === backupProviderID)?.default_model || 'Use provider default'} />
+        <ModelPicker id="backup-model" bind:value={backupModel} providerID={backupProviderID} placeholder={availableProviders.find(p => p.id === backupProviderID)?.default_model || 'Use provider default'} />
       {/if}
       <p id="backup-help" class="field-help">After 2 failed primary attempts on a model call, switch to the backup for the rest of the run. Applies to rate limits, timeouts, connection failures, and server errors. Backup uses its provider defaults, not primary model tuning.</p>
     </div>

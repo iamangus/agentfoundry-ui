@@ -6,6 +6,7 @@
   import Tools from './pages/Tools.svelte'
   import ApiKeys from './pages/ApiKeys.svelte'
   import Providers from './pages/Providers.svelte'
+  import InferenceProfiles from './pages/InferenceProfiles.svelte'
   import Executions from './pages/Executions.svelte'
   import { loadUser, canNavigate } from './lib/stores.js'
 
@@ -33,6 +34,8 @@
         <Agents />
       {:else if page === '/providers'}
         <Providers />
+      {:else if page === '/inference-profiles'}
+        <InferenceProfiles />
       {:else if page === '/tools'}
         <Tools />
       {:else if page === '/api-keys'}

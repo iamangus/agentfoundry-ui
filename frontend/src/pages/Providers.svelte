@@ -72,7 +72,7 @@
   }
 
   function typeBadge(t) {
-    const labels = { openai: 'OpenAI', anthropic: 'Anthropic', openrouter: 'OpenRouter', ollama: 'Ollama', 'llama-server': 'llama-server', custom: 'Custom' }
+    const labels = { openai: 'OpenAI', anthropic: 'Anthropic', openrouter: 'OpenRouter', deepseek: 'DeepSeek', ollama: 'Ollama', 'llama-server': 'llama-server', custom: 'Custom' }
     return labels[t] || t
   }
 </script>
