@@ -7,6 +7,7 @@
     { name: 'Agents', path: '/agents', icon: 'M8 9a4 4 0 1 0 8 0 4 4 0 0 0-8 0M4 21c0-7 16-7 16 0' },
     { name: 'Executions', path: '/executions', icon: 'M3 12h4l3-8 4 16 3-8h4' },
     { name: 'Providers', path: '/providers', icon: 'M4 7h16v10H4zM8 3v4m8-4v4M8 17v4m8-4v4', group: 'Configuration' },
+    { name: 'Inference profiles', path: '/inference-profiles', icon: 'M4 4h16v5H4zM4 15h16v5H4zM12 9v6' },
     { name: 'Tools', path: '/tools', icon: 'm8 4-5 8 5 8m8-16 5 8-5 8m-2-17-4 18' },
     { name: 'API keys', path: '/api-keys', icon: 'M14 8a5 5 0 1 0-4 8L21 5m-4 4 3 3' },
   ]

@@ -2,6 +2,7 @@
   import { api } from '../lib/api.js'
   import { dialogFocus } from '../lib/dialog.js'
   import { teams, loadTeams } from '../lib/stores.js'
+  import ModelPicker from './ModelPicker.svelte'
 
   let { provider = null, onclose, oncreated } = $props()
 
@@ -18,6 +19,21 @@
   let formHeaders = $state('')
   let formScope = $state('user')
   let formTeam = $state('')
+
+  function changeProviderType(event) {
+    const type = event.target.value
+    formProviderType = type
+    const defaults = { openai: 'https://api.openai.com/v1', anthropic: 'https://api.anthropic.com/v1', openrouter: 'https://openrouter.ai/api/v1', deepseek: 'https://api.deepseek.com', ollama: 'http://localhost:11434/v1' }
+    if (!formBaseURL || Object.values(defaults).includes(formBaseURL)) formBaseURL = defaults[type] || ''
+    if (type === 'deepseek') formSchemaValidation = false
+  }
+
+  function discoverModels() {
+    return api.post('/api/v1/models/discover', {
+      id: provider?.id || '', provider_type: formProviderType,
+      base_url: formBaseURL.trim(), api_key: formAPIKey.trim(), headers: parseHeaders()
+    })
+  }
 
 
   $effect(() => {
@@ -128,10 +144,11 @@
     <input id="provider-name" class="sb-input" bind:value={formName} placeholder="my-provider" />
 
     <label class="modal-label" for="provider-type">Provider Type</label>
-    <select id="provider-type" class="sb-input" bind:value={formProviderType}>
+    <select id="provider-type" class="sb-input" value={formProviderType} onchange={changeProviderType}>
       <option value="openai">OpenAI</option>
       <option value="anthropic">Anthropic</option>
       <option value="openrouter">OpenRouter</option>
+      <option value="deepseek">DeepSeek</option>
       <option value="ollama">Ollama</option>
       <option value="llama-server">llama-server</option>
       <option value="custom">Custom</option>
@@ -144,7 +161,7 @@
     <input id="provider-api-key" class="sb-input" bind:value={formAPIKey} placeholder={isEdit ? '(unchanged)' : 'sk-...'} type="password" />
 
     <label class="modal-label" for="provider-default-model">Default Model</label>
-    <input id="provider-default-model" class="sb-input" bind:value={formDefaultModel} placeholder="gpt-4o" />
+    <ModelPicker id="provider-default-model" bind:value={formDefaultModel} discover={discoverModels} queryKey={JSON.stringify([formProviderType, formBaseURL, formAPIKey, formHeaders])} placeholder="Choose or enter a default model" />
 
     <label class="modal-label" style="display:flex;align-items:center;gap:8px;cursor:pointer;">
       <input type="checkbox" bind:checked={formSchemaValidation} style="width:14px;height:14px;" />

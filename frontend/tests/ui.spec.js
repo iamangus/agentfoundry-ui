@@ -28,7 +28,7 @@ async function fixtures(page) {
   })
 }
 
-for (const path of ['/chat', '/agents', '/providers', '/tools', '/api-keys', '/executions']) {
+for (const path of ['/chat', '/agents', '/providers', '/inference-profiles', '/tools', '/api-keys', '/executions']) {
   test(`${path}: both themes, accessible structure, narrow layouts`, async ({ page }) => {
     await fixtures(page)
     await page.goto(path)
