@@ -97,6 +97,7 @@ test('profile management edits and deletes templates without updating agents', a
   expect(saved).toMatchObject({ name: 'Updated', provider_id: 'p1', backup_provider_id: 'p2' })
   await page.getByRole('button', { name: 'Create profile' }).click()
   await expect(page.getByRole('dialog').getByLabel('Name', { exact: true })).toHaveValue('')
+  await expect(page.getByRole('dialog').getByLabel('Name', { exact: true })).toBeFocused()
   await page.keyboard.press('Escape')
   await expect(page.getByRole('dialog')).toHaveCount(0)
   await page.getByRole('button', { name: 'Delete', exact: true }).click()
